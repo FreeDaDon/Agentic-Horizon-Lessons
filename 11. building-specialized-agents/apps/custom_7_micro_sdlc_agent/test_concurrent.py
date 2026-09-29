@@ -22,7 +22,7 @@ async def create_ticket(session, title, prompt):
     data = {
         "title": title,
         "content_user_request_prompt": prompt,
-        "model": "claude-sonnet-4-20250514",
+        "model": "sonnet",
         "parent_codebase_path": "."
     }
 

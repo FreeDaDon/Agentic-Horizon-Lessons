@@ -186,7 +186,7 @@ class AutocompleteAgent:
         # Build ClaudeAgentOptions
         options_dict = {
             "system_prompt": placeholder_system_prompt,
-            "model": "claude-haiku-4-5-20251001",  # LATEST HAIKU MODEL
+            "model": "haiku",  # LATEST HAIKU MODEL
             "cwd": self.working_dir,
         }
 

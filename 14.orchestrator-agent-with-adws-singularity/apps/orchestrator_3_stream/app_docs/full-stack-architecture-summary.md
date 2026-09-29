@@ -26,7 +26,7 @@
 - **PostgreSQL Database**: Persistent storage for orchestrator state, agents, event logs, chat history, and cost tracking with JSONB metadata fields.
 
 **AI Layer:**
-- **Orchestrator Agent**: Primary Claude Sonnet 4.5 agent with management tools that creates/commands subordinate agents via MCP server.
+- **Orchestrator Agent**: Primary Claude Sonnet agent with management tools that creates/commands subordinate agents via MCP server.
 - **Command Agents**: Subordinate Claude agents (Sonnet/Haiku) created and managed by orchestrator to execute specific tasks with hook-based event capture.
 - **Management Tools (MCP)**: 8-tool MCP server exposing agent management operations (create_agent, command_agent, etc.) to orchestrator.
 
@@ -69,7 +69,7 @@ graph TB
     end
 
     subgraph "AI Layer (Claude SDK)"
-        Orchestrator[Orchestrator Agent<br/>Claude Sonnet 4.5]
+        Orchestrator[Orchestrator Agent<br/>Claude Sonnet]
         CommandAgents[Command Agents<br/>Sonnet/Haiku]
         Tools[Management Tools<br/>MCP Server]
     end
@@ -517,7 +517,7 @@ DATABASE_POOL_SIZE=10
 DATABASE_MAX_OVERFLOW=20
 
 # Orchestrator
-ORCHESTRATOR_MODEL=claude-sonnet-4-5-20250929
+ORCHESTRATOR_MODEL=sonnet
 ORCHESTRATOR_WORKING_DIR=/path/to/project
 
 # Logging

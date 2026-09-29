@@ -37,12 +37,12 @@ PLAN_DIRECTORY = "specs"
 REVIEW_DIRECTORY = "reviews"
 
 # Default model for agents
-DEFAULT_MODEL = "claude-sonnet-4-20250514"
+DEFAULT_MODEL = "sonnet"
 
 # Available models
 AVAILABLE_MODELS = [
-    "claude-sonnet-4-20250514",
-    "claude-opus-4-1-20250805"
+    "sonnet",
+    "opus"
 ]
 
 # ============================================================================

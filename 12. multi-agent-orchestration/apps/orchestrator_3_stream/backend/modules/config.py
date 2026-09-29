@@ -87,12 +87,12 @@ CORS_ORIGINS = os.getenv(
 # ============================================================================
 
 # Default model for agents
-DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
+DEFAULT_MODEL = "sonnet"
 
-FAST_MODEL = "claude-haiku-4-5-20251001"
+FAST_MODEL = "haiku"
 
 # Available models
-AVAILABLE_MODELS = ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]
+AVAILABLE_MODELS = ["sonnet", "haiku"]
 
 # ============================================================================
 # ORCHESTRATOR CONFIGURATION

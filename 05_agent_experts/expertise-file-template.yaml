@@ -1,0 +1,64 @@
+# <Domain> Expertise — the expert's mental model.
+# NOT a source of truth: the code/system is. Every claim here is validated against it
+# by /experts:<domain>:question and /experts:<domain>:self-improve before being trusted.
+# Agent-owned: humans review diffs of this file but do not hand-edit it.
+# Hard cap: 1000 lines (enforced by self-improve.md).
+#
+# Seed only `overview` on day one, then run self-improve repeatedly until it reports
+# no discrepancies. The agent grows the remaining sections itself.
+
+overview:
+  description: "<one line: what this domain/system does>"
+  key_files:
+    - "<path/to/critical/file>"
+    - "<path/to/second/file>"
+  stack: "<language, framework, driver, external services>"
+  architecture_pattern: "<e.g. repository pattern over asyncpg pool>"
+
+core_implementation:
+  <component_name>:
+    file: "<path>"
+    lines: 0              # file length at last validation
+    purpose: "<why this component exists>"
+    key_functions:
+      <function_name>: "<what it does> (line N)"
+
+<domain_specific_section>:   # rename: schema_structure | event_types | signal_definitions | detection_rules | modules
+  <item_name>:
+    description: "<one line>"
+    fields: ["<field>", "<field>"]
+    location: "<path> (lines a-b)"
+
+key_operations:
+  <operation_group>:
+    <operation_name>:
+      function: "<name> (line N)"
+      logic: "<one line>"
+
+testing:
+  <suite_name>:
+    file: "<path>"
+    command: "<exact command to run it>"
+    coverage: ["<what it proves>"]
+
+best_practices:
+  - "<imperative rule learned from real changes>"
+
+known_issues:
+  <issue_id>:
+    severity: "Low"       # Low | Medium | High
+    description: "<what is wrong>"
+    impact: "<who or what it affects>"
+    solution: "<fix or workaround>"
+
+potential_enhancements:
+  - "<improvement> (Recommended)"
+  - "<improvement> (Nice-to-have)"
+
+key_file_locations:
+  <group>:
+    <name>: "<path> (lines a-b)"
+
+architecture_summary: |
+  <3-5 short paragraphs, written as a principal engineer would write them for the
+  next engineer: data flow, invariants, where changes usually go wrong.>

@@ -12,6 +12,24 @@ import sys
 from dotenv import load_dotenv
 
 
+_MODEL_CACHE = {}
+
+
+def resolve_model(client, family="haiku"):
+    """Newest model ID in a family ("opus", "sonnet", "haiku").
+
+    The Messages API needs a full model ID, so look it up instead of hardcoding a
+    version. Set ANTHROPIC_MODEL_<FAMILY> (e.g. ANTHROPIC_MODEL_HAIKU) to pin one.
+    """
+    override = os.getenv(f"ANTHROPIC_MODEL_{family.upper()}")
+    if override:
+        return override
+    if family not in _MODEL_CACHE:
+        # models.list() returns the most recently released models first
+        _MODEL_CACHE[family] = next(m.id for m in client.models.list() if family in m.id)
+    return _MODEL_CACHE[family]
+
+
 def prompt_llm(prompt_text):
     """
     Base Anthropic LLM prompting method using fastest model.
@@ -34,7 +52,7 @@ def prompt_llm(prompt_text):
         client = anthropic.Anthropic(api_key=api_key)
 
         message = client.messages.create(
-            model="claude-3-5-haiku-20241022",  # Fastest Anthropic model
+            model=resolve_model(client, "haiku"),  # Fastest Anthropic model
             max_tokens=100,
             temperature=0.7,
             messages=[{"role": "user", "content": prompt_text}],
@@ -137,7 +155,7 @@ Name:"""
         client = anthropic.Anthropic(api_key=api_key)
         
         message = client.messages.create(
-            model="claude-3-5-haiku-20241022",  # Fast model
+            model=resolve_model(client, "haiku"),  # Fast model
             max_tokens=20,
             temperature=0.7,
             messages=[{"role": "user", "content": prompt_text}],

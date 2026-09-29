@@ -699,7 +699,7 @@ Ask the user:
 ## 3. Design the Structure
 
 Create frontmatter with:
-- `model: claude-sonnet-4-5-20250929` (always)
+- `model: sonnet` (always)
 - `description:` (concise /help menu text)
 - `argument-hint:` (if takes arguments)
 - `allowed-tools:` (if restricting tools)
@@ -737,7 +737,7 @@ Iterate based on results
 
 ```yaml
 ---
-model: claude-sonnet-4-5-20250929
+model: sonnet
 description: [Brief description for /help menu]
 argument-hint: [arg1] [arg2] (optional)
 allowed-tools: [Only if restricting] (optional)
@@ -757,7 +757,7 @@ allowed-tools: [Only if restricting] (optional)
 ## Key Principles
 
 ✅ **Always:**
-- Include `model: claude-sonnet-4-5-20250929`
+- Include `model: sonnet`
 - Write clear, actionable workflow steps
 - Define exact report format
 - Use descriptive variable names

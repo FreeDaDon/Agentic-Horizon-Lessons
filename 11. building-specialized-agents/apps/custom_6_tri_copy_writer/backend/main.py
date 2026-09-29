@@ -276,7 +276,7 @@ async def generate_copy_variations(
     # Configure Claude Code options with session resumption
     options = ClaudeAgentOptions(
         system_prompt=SYSTEM_PROMPT,
-        model="claude-sonnet-4-20250514",
+        model="sonnet",
         resume=session_id,  # KEY: Resume existing session for continuity!
         disallowed_tools=[
             # Disable all built-in tools - calculator only needs custom tools
@@ -308,7 +308,7 @@ async def generate_copy_variations(
             Panel.fit(
                 Text.assemble(
                     ("🤖 Invoking Claude Agent SDK\n", "bold magenta"),
-                    (f"Model: claude-sonnet-4-20250514\n", "cyan"),
+                    (f"Model: sonnet\n", "cyan"),
                     (f"Session: {'Resuming' if session_id else 'New'}", "yellow"),
                 ),
                 title="AI Processing",
@@ -440,7 +440,7 @@ async def get_config():
     """Get backend configuration including number of versions"""
     return {
         "versions_configured": NUMBER_OF_VERSIONS,
-        "model": "claude-sonnet-4-20250514",
+        "model": "sonnet",
         "backend_name": "Tri-Copy-Writer Backend",
     }
 

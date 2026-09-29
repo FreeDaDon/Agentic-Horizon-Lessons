@@ -15,6 +15,24 @@ import os
 import sys
 
 
+_MODEL_CACHE = {}
+
+
+def resolve_model(client, family="haiku"):
+    """Newest model ID in a family ("opus", "sonnet", "haiku").
+
+    The Messages API needs a full model ID, so look it up instead of hardcoding a
+    version. Set ANTHROPIC_MODEL_<FAMILY> (e.g. ANTHROPIC_MODEL_HAIKU) to pin one.
+    """
+    override = os.getenv(f"ANTHROPIC_MODEL_{family.upper()}")
+    if override:
+        return override
+    if family not in _MODEL_CACHE:
+        # models.list() returns the most recently released models first
+        _MODEL_CACHE[family] = next(m.id for m in client.models.list() if family in m.id)
+    return _MODEL_CACHE[family]
+
+
 def generate_event_summary(event_data):
     """
     Generate a natural language summary of the event using Anthropic's API.
@@ -82,7 +100,7 @@ Write a brief, natural language summary that captures what happened."""
         client = anthropic.Anthropic(api_key=api_key)
         
         message = client.messages.create(
-            model="claude-haiku-4-5-20251001",  # Fast model for summaries
+            model=resolve_model(client, "haiku"),  # Fast model for summaries
             max_tokens=50,
             temperature=0.3,
             messages=[

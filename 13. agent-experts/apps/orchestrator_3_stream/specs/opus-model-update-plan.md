@@ -2,13 +2,13 @@
 
 ## Objective
 
-Update the default model configuration from Claude Sonnet (`claude-sonnet-4-5-20250929`) to Claude Opus (`claude-opus-4-5-20251101`) for both the orchestrator agent and command-level agents in the multi-agent orchestration system.
+Update the default model configuration from Claude Sonnet (`sonnet`) to Claude Opus (`opus`) for both the orchestrator agent and command-level agents in the multi-agent orchestration system.
 
 ## Requirements Summary
 
 1. **Change default model** from Sonnet to Opus
 2. **Add 'opus' alias** to model alias mapping
-3. **Support full model name** `claude-opus-4-5-20251101`
+3. **Support full model name** `opus`
 4. **Keep haiku/fast model logic unchanged**
 5. **Orchestrator agent** must use Opus as default
 6. **Command-level agents** must use Opus as default (unless overridden)
@@ -51,12 +51,12 @@ config.py (DEFAULT_MODEL, ORCHESTRATOR_MODEL, DEFAULT_AGENT_MODEL)
 ```python
 # Line 89-95
 # Default model for agents
-DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
+DEFAULT_MODEL = "sonnet"
 
-FAST_MODEL = "claude-haiku-4-5-20251001"
+FAST_MODEL = "haiku"
 
 # Available models
-AVAILABLE_MODELS = ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]
+AVAILABLE_MODELS = ["sonnet", "haiku"]
 
 # Line 101-102
 # Orchestrator agent model
@@ -67,12 +67,12 @@ ORCHESTRATOR_MODEL = os.getenv("ORCHESTRATOR_MODEL", DEFAULT_MODEL)
 ```python
 # Line 89-95
 # Default model for agents (Opus is the primary model)
-DEFAULT_MODEL = "claude-opus-4-5-20251101"
+DEFAULT_MODEL = "opus"
 
-FAST_MODEL = "claude-haiku-4-5-20251001"
+FAST_MODEL = "haiku"
 
 # Available models
-AVAILABLE_MODELS = ["claude-opus-4-5-20251101", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]
+AVAILABLE_MODELS = ["opus", "sonnet", "haiku"]
 
 # Line 101-102
 # Orchestrator agent model
@@ -94,9 +94,9 @@ ORCHESTRATOR_MODEL = os.getenv("ORCHESTRATOR_MODEL", DEFAULT_MODEL)
 ```python
 # Model alias mapping
 model_aliases = {
-    "sonnet": "claude-sonnet-4-5-20250929",
-    "haiku": "claude-haiku-4-5-20251001",
-    "fast": "claude-haiku-4-5-20251001",  # Alias for haiku
+    "sonnet": "sonnet",
+    "haiku": "haiku",
+    "fast": "haiku",  # Alias for haiku
 }
 ```
 
@@ -104,10 +104,10 @@ model_aliases = {
 ```python
 # Model alias mapping
 model_aliases = {
-    "opus": "claude-opus-4-5-20251101",
-    "sonnet": "claude-sonnet-4-5-20250929",
-    "haiku": "claude-haiku-4-5-20251001",
-    "fast": "claude-haiku-4-5-20251001",  # Alias for haiku
+    "opus": "opus",
+    "sonnet": "sonnet",
+    "haiku": "haiku",
+    "fast": "haiku",  # Alias for haiku
 }
 ```
 
@@ -138,13 +138,13 @@ model_aliases = {
 
 ### `backend/modules/single_agent_prompt.py`
 
-**Line 35:** `FAST_MODEL = "claude-haiku-4-5-20251001"`
+**Line 35:** `FAST_MODEL = "haiku"`
 
 **Reason:** This module is specifically designed for fast, cheap summarization operations. Haiku should remain the default here for cost efficiency. The module explicitly states: "Fast single-shot queries using Claude Haiku for speed and cost efficiency."
 
 ### `backend/modules/autocomplete_agent.py`
 
-**Line 189:** `"model": "claude-haiku-4-5-20251001",  # LATEST HAIKU MODEL`
+**Line 189:** `"model": "haiku",  # LATEST HAIKU MODEL`
 
 **Reason:** Autocomplete functionality is intentionally using Haiku for speed and cost. This is a deliberate design choice, not a default configuration issue.
 
@@ -160,37 +160,37 @@ model_aliases = {
 
 ### Step 1: Update `config.py`
 
-1. Change `DEFAULT_MODEL` from `"claude-sonnet-4-5-20250929"` to `"claude-opus-4-5-20251101"`
+1. Change `DEFAULT_MODEL` from `"sonnet"` to `"opus"`
 2. Update `AVAILABLE_MODELS` to include Opus first (as primary model)
 
 ```python
 # Before
-DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
-AVAILABLE_MODELS = ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]
+DEFAULT_MODEL = "sonnet"
+AVAILABLE_MODELS = ["sonnet", "haiku"]
 
 # After
-DEFAULT_MODEL = "claude-opus-4-5-20251101"
-AVAILABLE_MODELS = ["claude-opus-4-5-20251101", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]
+DEFAULT_MODEL = "opus"
+AVAILABLE_MODELS = ["opus", "sonnet", "haiku"]
 ```
 
 ### Step 2: Update `agent_manager.py`
 
-1. Add `"opus": "claude-opus-4-5-20251101"` to `model_aliases` dict
+1. Add `"opus": "opus"` to `model_aliases` dict
 
 ```python
 # Before
 model_aliases = {
-    "sonnet": "claude-sonnet-4-5-20250929",
-    "haiku": "claude-haiku-4-5-20251001",
-    "fast": "claude-haiku-4-5-20251001",
+    "sonnet": "sonnet",
+    "haiku": "haiku",
+    "fast": "haiku",
 }
 
 # After
 model_aliases = {
-    "opus": "claude-opus-4-5-20251101",
-    "sonnet": "claude-sonnet-4-5-20250929",
-    "haiku": "claude-haiku-4-5-20251001",
-    "fast": "claude-haiku-4-5-20251001",
+    "opus": "opus",
+    "sonnet": "sonnet",
+    "haiku": "haiku",
+    "fast": "haiku",
 }
 ```
 
@@ -202,30 +202,30 @@ model_aliases = {
 
 1. **Orchestrator uses Opus by default**
    - Start orchestrator without `ORCHESTRATOR_MODEL` env var
-   - Verify orchestrator options show `model: claude-opus-4-5-20251101`
+   - Verify orchestrator options show `model: opus`
 
 2. **Command agents use Opus by default**
    - Create agent without specifying model: `create_agent(name="test", system_prompt="...")`
-   - Verify agent.model is `claude-opus-4-5-20251101`
+   - Verify agent.model is `opus`
 
 3. **'opus' alias works**
    - Create agent with `model: "opus"`
-   - Verify agent.model resolves to `claude-opus-4-5-20251101`
+   - Verify agent.model resolves to `opus`
 
 4. **Full model name works**
-   - Create agent with `model: "claude-opus-4-5-20251101"`
-   - Verify agent.model is `claude-opus-4-5-20251101`
+   - Create agent with `model: "opus"`
+   - Verify agent.model is `opus`
 
 5. **'sonnet' alias still works**
    - Create agent with `model: "sonnet"`
-   - Verify agent.model resolves to `claude-sonnet-4-5-20250929`
+   - Verify agent.model resolves to `sonnet`
 
 6. **'haiku'/'fast' aliases still work**
    - Create agent with `model: "haiku"` or `model: "fast"`
-   - Verify agent.model resolves to `claude-haiku-4-5-20251001`
+   - Verify agent.model resolves to `haiku`
 
 7. **Environment variable override works**
-   - Set `ORCHESTRATOR_MODEL=claude-sonnet-4-5-20250929`
+   - Set `ORCHESTRATOR_MODEL=sonnet`
    - Verify orchestrator uses Sonnet instead of Opus
 
 8. **Fast/summarization models unchanged**
@@ -256,7 +256,7 @@ model_aliases = {
 ## Rollback Plan
 
 If issues arise, revert by:
-1. Change `DEFAULT_MODEL` back to `"claude-sonnet-4-5-20250929"` in `config.py`
+1. Change `DEFAULT_MODEL` back to `"sonnet"` in `config.py`
 2. Keep `opus` alias in `agent_manager.py` (no harm in keeping it)
 
 ---

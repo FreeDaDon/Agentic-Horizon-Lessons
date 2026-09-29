@@ -230,7 +230,7 @@ options = ClaudeAgentOptions(
     mcp_servers={"shopping": server},
     allowed_tools=["mcp__shopping__get_products_by_ids", ...],
     system_prompt=system_prompt,
-    model="claude-sonnet-4-20250514"
+    model="sonnet"
 )
 
 # Run agent

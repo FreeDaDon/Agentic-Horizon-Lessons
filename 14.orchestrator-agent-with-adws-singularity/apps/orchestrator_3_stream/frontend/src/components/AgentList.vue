@@ -189,11 +189,11 @@ const onSelectAgent = (id: string) => {
 
 const formatModel = (model: string): string => {
   if (model.includes("sonnet")) {
-    return "sonnet-4.5";
+    return "sonnet";
   } else if (model.includes("opus")) {
-    return "opus-4.5";
+    return "opus";
   } else if (model.includes("haiku")) {
-    return "haiku-4.5";
+    return "haiku";
   }
   return model;
 };

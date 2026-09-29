@@ -128,9 +128,9 @@ class AgentManager:
 
                 # Model alias mapping
                 model_aliases = {
-                    "sonnet": "claude-sonnet-4-5-20250929",
-                    "haiku": "claude-haiku-4-5-20251001",
-                    "fast": "claude-haiku-4-5-20251001",  # Alias for haiku
+                    "sonnet": "sonnet",
+                    "haiku": "haiku",
+                    "fast": "haiku",  # Alias for haiku
                 }
 
                 # Resolve model alias or use as-is

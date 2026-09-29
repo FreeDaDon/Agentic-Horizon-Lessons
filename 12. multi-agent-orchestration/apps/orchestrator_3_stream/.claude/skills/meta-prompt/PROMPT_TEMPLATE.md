@@ -39,7 +39,7 @@ Frontmatter is YAML metadata at the top of your command file that controls Claud
 
 | Field | Purpose | Example |
 |-------|---------|---------|
-| `model` | Claude model version | `claude-sonnet-4-5-20250929` |
+| `model` | Claude model version | `sonnet` |
 | `description` | Brief command description for `/help` menu | `Review code for best practices` |
 
 ### Optional Fields
@@ -51,7 +51,7 @@ Frontmatter is YAML metadata at the top of your command file that controls Claud
 
 ### Important Notes
 
-- **Always include** `model: claude-sonnet-4-5-20250929` for consistency and optimal performance
+- **Always include** `model: sonnet` for consistency and optimal performance
 - **Always include** a clear `description` field for the `/help` menu
 - **Only include** `allowed-tools` when you need to restrict tool access
 - **DO NOT use** `disable-model-invocation` - we want agents to be able to trigger commands
@@ -61,7 +61,7 @@ Frontmatter is YAML metadata at the top of your command file that controls Claud
 **Basic slash command (most common):**
 ```yaml
 ---
-model: claude-sonnet-4-5-20250929
+model: sonnet
 description: Review code for best practices
 ---
 ```
@@ -69,7 +69,7 @@ description: Review code for best practices
 **Command with arguments:**
 ```yaml
 ---
-model: claude-sonnet-4-5-20250929
+model: sonnet
 description: Creates implementation plan from user requirements and documentation
 argument-hint: [user-prompt] [doc-urls]
 ---
@@ -78,7 +78,7 @@ argument-hint: [user-prompt] [doc-urls]
 **Command with restricted tools:**
 ```yaml
 ---
-model: claude-sonnet-4-5-20250929
+model: sonnet
 description: Show git commit history for a specific file
 argument-hint: [file-path]
 allowed-tools: Bash(git:*)
@@ -93,7 +93,7 @@ Use this template when creating new slash commands. Replace all `[placeholders]`
 
 ```markdown
 ---
-model: claude-sonnet-4-5-20250929
+model: sonnet
 description: [Brief description for /help menu]
 argument-hint: [arg1] [arg2] (only if command takes arguments)
 allowed-tools: [Only specify if restricting tools]

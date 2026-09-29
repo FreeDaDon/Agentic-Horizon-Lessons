@@ -391,7 +391,7 @@ class QAAgentREPL:
             system_prompt=self.system_prompt,
             allowed_tools=self.allowed_tools,
             disallowed_tools=self.disallowed_tools,
-            model="claude-sonnet-4-20250514",  # Claude 4 fast model
+            model="sonnet",  # Claude fast model
             resume=resume_session,  # Resume previous session if provided
             hooks=hooks,  # Inline hooks for security (works for subagents!)
         )

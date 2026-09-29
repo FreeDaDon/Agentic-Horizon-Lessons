@@ -1,7 +1,7 @@
 ---
 description: Search the codebase for files needed to complete the task
 argument-hint: [user-prompt] [scale]
-model: claude-sonnet-4-5-20250929
+model: sonnet
 ---
 
 # Purpose

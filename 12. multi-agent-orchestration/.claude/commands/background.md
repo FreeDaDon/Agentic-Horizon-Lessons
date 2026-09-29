@@ -2,7 +2,7 @@
 description: Fires off a full Claude Code instance in the background
 argument-hint: [prompt] [model] [report-file]
 allowed-tools: Bash, BashOutput, Read, Edit, MultiEdit, Write, Grep, Glob, WebFetch, WebSearch, TodoWrite, Task
-model: claude-sonnet-4-5-20250929
+model: sonnet
 ---
 
 # Background Claude Code

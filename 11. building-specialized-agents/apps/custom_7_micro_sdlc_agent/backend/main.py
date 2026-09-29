@@ -166,7 +166,7 @@ workflow_tracker = WorkflowTracker()
 class CreateTicketRequest(BaseModel):
     title: str
     content_user_request_prompt: str
-    model: str = "claude-sonnet-4-20250514"
+    model: str = "sonnet"
     parent_codebase_path: str = DEFAULT_CODEBASE_PATH
 
 

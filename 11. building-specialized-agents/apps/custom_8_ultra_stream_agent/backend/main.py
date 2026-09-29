@@ -853,7 +853,7 @@ async def initialize_stream_agent(resume_session=True):
             "BashOutput",
             "KillShell",
         ],
-        model="claude-sonnet-4-20250514",
+        model="sonnet",
         resume=session_id,  # Resume existing session for continuity
     )
 
@@ -954,7 +954,7 @@ async def initialize_inspector_agent(resume_session=True):
             "KillShell",
         ],
         system_prompt=system_prompt,
-        model="claude-sonnet-4-20250514",
+        model="sonnet",
         resume=session_id,  # Resume existing session for continuity
     )
 

@@ -266,11 +266,11 @@ CORS_ORIGINS        = os.getenv("CORS_ORIGINS", f"http://{FRONTEND_HOST}:{FRONTE
 
 ### Model Configuration
 ```python
-DEFAULT_MODEL       = "claude-sonnet-4-5-20250929"
-FAST_MODEL          = "claude-haiku-4-5-20251001"
+DEFAULT_MODEL       = "sonnet"
+FAST_MODEL          = "haiku"
 ORCHESTRATOR_MODEL  = os.getenv("ORCHESTRATOR_MODEL", DEFAULT_MODEL)
 DEFAULT_AGENT_MODEL = os.getenv("DEFAULT_AGENT_MODEL", DEFAULT_MODEL)
-AVAILABLE_MODELS    = ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]
+AVAILABLE_MODELS    = ["sonnet", "haiku"]
 ```
 
 ### Path Configuration

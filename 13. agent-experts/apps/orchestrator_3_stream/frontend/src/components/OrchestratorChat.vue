@@ -168,7 +168,7 @@ const orchestratorCost = computed(() => {
   return (store.orchestratorAgent?.total_cost ?? 0).toFixed(2);
 });
 
-// Context window display (200k for Claude Sonnet 4.5)
+// Context window display (200k for Claude Sonnet)
 const CONTEXT_WINDOW_SIZE = 200000;
 
 const currentTokens = computed(() => {

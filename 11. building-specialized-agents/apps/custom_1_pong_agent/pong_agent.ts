@@ -34,7 +34,7 @@ async function main() {
   // Step 2: Configure the agent with a system prompt
   // The system prompt defines the agent's behavior
   const systemPrompt = "You are a pong agent. Always respond with exactly 'pong' to any input, nothing more.";
-  const model = "claude-sonnet-4-20250514"; // Fast model for simple tasks
+  const model = "sonnet"; // Fast model for simple tasks
 
   const options: Options = {
     customSystemPrompt: systemPrompt,

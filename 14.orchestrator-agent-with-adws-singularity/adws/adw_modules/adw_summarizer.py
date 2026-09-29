@@ -29,7 +29,7 @@ from claude_agent_sdk import query, ClaudeAgentOptions, AssistantMessage, TextBl
 
 
 # Fast model for summarization (Haiku for speed and cost)
-FAST_MODEL = "claude-haiku-4-5-20251001"
+FAST_MODEL = "haiku"
 
 # Prompt templates (inline to avoid file dependencies)
 EVENT_SUMMARIZER_SYSTEM_PROMPT = """You are a concise log summarizer. Create brief, informative 1-sentence summaries of events. Focus on the key action or information. Keep summaries under 100 characters."""

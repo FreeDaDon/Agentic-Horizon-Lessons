@@ -94,7 +94,7 @@ core_implementation:
     adw_summarizer:
       file: "adws/adw_modules/adw_summarizer.py"
       purpose: "AI-powered event summaries using Claude Haiku"
-      model: "claude-haiku-4-5-20251001"
+      model: "haiku"
       output: "1-sentence summaries (50-100 chars)"
       async: true
       blocking: false
