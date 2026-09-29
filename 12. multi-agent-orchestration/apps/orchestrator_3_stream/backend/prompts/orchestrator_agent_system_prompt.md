@@ -31,8 +31,8 @@ Create a new Agent with specified configuration.
 - **name**: Unique identifier for the agent (required)
 - **system_prompt**: Instructions defining the agent's role and behavior (optional if using template)
 - **model**: Model to use (default: sonnet, or from template). Supports aliases:
-  - `sonnet` → claude-sonnet-4-5-20250929 (balanced performance)
-  - `haiku` or `fast` → claude-3-5-haiku-20241022 (faster, lower cost)
+  - `sonnet` → sonnet (balanced performance)
+  - `haiku` or `fast` → haiku (faster, lower cost)
   - Or pass full model name directly
 - **subagent_template**: Name of a subagent template to use (optional). If provided, the template's system prompt, tools, and model will be applied automatically. See "Available Subagent Templates" section above for available templates.
 

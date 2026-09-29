@@ -208,7 +208,7 @@ def format_agent_message(
 
 async def run_planner_agent(
     user_prompt: str,
-    model: str = "claude-sonnet-4-20250514",
+    model: str = "sonnet",
     codebase_path: str = ".",
     resume_session_id: Optional[str] = None,
     message_callback: Optional[callable] = None,
@@ -411,7 +411,7 @@ async def run_planner_agent(
 
 async def run_builder_agent(
     plan_path: str,
-    model: str = "claude-sonnet-4-20250514",
+    model: str = "sonnet",
     codebase_path: str = ".",
     resume_session_id: Optional[str] = None,
     message_callback: Optional[callable] = None,
@@ -519,7 +519,7 @@ async def run_builder_agent(
 async def run_reviewer_agent(
     plan_path: str,
     ticket_title: str,
-    model: str = "claude-sonnet-4-20250514",
+    model: str = "sonnet",
     codebase_path: str = ".",
     resume_session_id: Optional[str] = None,
     message_callback: Optional[callable] = None,

@@ -2,7 +2,7 @@
 description: Build the codebase based on the plan
 argument-hint: [path-to-plan]
 allowed-tools: Read, Write, Bash
-model: claude-sonnet-4-5-20250929
+model: sonnet
 ---
 
 # Build

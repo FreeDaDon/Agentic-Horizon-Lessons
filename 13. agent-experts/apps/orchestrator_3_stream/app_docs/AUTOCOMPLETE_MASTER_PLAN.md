@@ -6,7 +6,7 @@
 
 **CRITICAL UPDATES:**
 - ✅ Uses Claude Agent SDK (not raw Anthropic client)
-- ✅ Uses latest Haiku model: `claude-haiku-4-5-20251001`
+- ✅ Uses latest Haiku model: `haiku`
 - ✅ Session persistence via expertise.yaml
 - ✅ Both orchestrator_agent_id AND completion_agent_id tracking
 - ✅ **FULL TYPE SAFETY**: Pydantic models for all expertise.yaml data
@@ -121,14 +121,14 @@ An **intelligent autocomplete system** that displays **3 context-aware completio
 │    • Check orchestrator_agent_id match                       │
 │    • Reuse OR reset session based on ID match               │
 │    • Replace variables (7 total)                             │
-│    • Call Claude Agent SDK (Haiku 4.5)                       │
+│    • Call Claude Agent SDK (Haiku)                       │
 │    • Parse JSON response                                      │
 │    • Save session_id + data to expertise.yaml               │
 └───────────────────────────────────────────────────────────────┘
                 ↓                           ↓
 ┌──────────────────────┐      ┌─────────────────────────────────┐
 │  Claude Agent SDK    │      │  expertise.yaml                 │
-│  (Haiku 4.5)         │      │  • orchestrator_agent_id        │
+│  (Haiku)         │      │  • orchestrator_agent_id        │
 │                      │      │  • completion_agent_id (NEW)    │
 │  System Prompt       │      │  • previous_completions[]       │
 │  User Prompt         │      │    (union type: none | auto)    │
@@ -154,7 +154,7 @@ main.py (FastAPI)
     └─► POST /autocomplete-update
             └─► AutocompleteService
                     └─► AutocompleteAgent (Claude Agent SDK)
-                            ├─► Claude Agent SDK (Haiku 4.5)
+                            ├─► Claude Agent SDK (Haiku)
                             └─► expertise.yaml (session + completions)
 ```
 
@@ -373,8 +373,8 @@ Before implementing, understand these key architectural decisions:
 - **Why:** SDK manages session persistence automatically
 
 ### 2. **Latest Haiku Model**
-- ✅ Use `claude-haiku-4-5-20251001`
-- ❌ Do NOT use older versions like `claude-3-haiku-20240307`
+- ✅ Use `haiku`
+- ❌ Do NOT use older versions like `haiku`
 - **Why:** Latest model has better performance and features
 
 ### 3. **Dual ID Tracking**
@@ -681,7 +681,7 @@ class AutocompleteAgent:
         # Build ClaudeAgentOptions
         options_dict = {
             'system_prompt': self._load_system_prompt_with_variables(""),  # Placeholder
-            'model': 'claude-haiku-4-5-20251001',  # LATEST HAIKU MODEL
+            'model': 'haiku',  # LATEST HAIKU MODEL
             'cwd': self.working_dir,
         }
 

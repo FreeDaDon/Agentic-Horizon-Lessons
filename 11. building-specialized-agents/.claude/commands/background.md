@@ -2,7 +2,7 @@
 description: Fires off a full Claude Code instance in the background
 argument-hint: [prompt] [model] [report-file]
 allowed-tools: Bash, BashOutput, Read, Edit, MultiEdit, Write, Grep, Glob, WebFetch, WebSearch, TodoWrite, Task
-model: claude-opus-4-1-20250805
+model: opus
 ---
 
 # Background Claude Code

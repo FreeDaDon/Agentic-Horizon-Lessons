@@ -18,14 +18,14 @@ Usage:
     uv run adws/adw_triggers/adw_manual_trigger.py <adw_name> <workflow_type> <prompt> <working_dir> [model]
 
 Example:
-    uv run adws/adw_triggers/adw_manual_trigger.py "test-feature" "plan_build" "Create a hello world script" "/path/to/project" "claude-sonnet-4-5-20250929"
+    uv run adws/adw_triggers/adw_manual_trigger.py "test-feature" "plan_build" "Create a hello world script" "/path/to/project" "sonnet"
 
 Arguments:
     adw_name:      Human-readable name for the ADW (e.g., "test-feature")
     workflow_type: Workflow type (maps to adw_workflows/adw_<type>.py, e.g., "plan_build")
     prompt:        The task prompt to execute
     working_dir:   Working directory for the agents
-    model:         Optional model name (default: claude-sonnet-4-5-20250929)
+    model:         Optional model name (default: sonnet)
 """
 
 from __future__ import annotations
@@ -90,11 +90,11 @@ async def create_adw_record(
 
     # Add review_model for review workflows
     if workflow_type in ("plan_build_review", "plan_build_review_fix"):
-        input_data["review_model"] = "claude-opus-4-5-20251101"
+        input_data["review_model"] = "opus"
 
     # Add fix_model for fix workflows
     if workflow_type == "plan_build_review_fix":
-        input_data["fix_model"] = "claude-opus-4-5-20251101"
+        input_data["fix_model"] = "opus"
 
     # Determine total_steps based on workflow type
     workflow_steps = {
@@ -317,7 +317,7 @@ Examples:
         "feature-auth" "plan_build" \\
         "Implement user authentication with JWT tokens" \\
         "/path/to/project" \\
-        "claude-opus-4-5-20251101"
+        "opus"
         """,
     )
 
@@ -340,8 +340,8 @@ Examples:
     parser.add_argument(
         "model",
         nargs="?",
-        default="claude-sonnet-4-5-20250929",
-        help="Model name (default: claude-sonnet-4-5-20250929)",
+        default="sonnet",
+        help="Model name (default: sonnet)",
     )
 
     args = parser.parse_args()

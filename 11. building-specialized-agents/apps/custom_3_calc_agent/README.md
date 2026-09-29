@@ -107,7 +107,7 @@ base_options = {
         "mcp__calculator__custom_unit_converter",
     ],
     "system_prompt": "...Remember our conversation history...",
-    "model": "claude-sonnet-4-20250514",
+    "model": "sonnet",
 }
 ```
 

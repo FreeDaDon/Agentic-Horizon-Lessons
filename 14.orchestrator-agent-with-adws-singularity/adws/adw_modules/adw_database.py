@@ -197,7 +197,7 @@ async def create_agent(
     Args:
         orchestrator_agent_id: Parent orchestrator agent UUID
         name: Agent name (e.g., "plan-agent", "build-agent")
-        model: Model name (e.g., "claude-sonnet-4-5-20250929")
+        model: Model name (e.g., "sonnet")
         working_dir: Working directory for the agent
         adw_id: Optional ADW ID this agent belongs to
         adw_step: Optional ADW step this agent is executing

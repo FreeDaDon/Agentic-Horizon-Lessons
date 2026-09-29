@@ -43,15 +43,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class ModelName(str, Enum):
     """Available Claude models for the Agent SDK."""
 
-    # Claude 4.5 models (latest)
-    OPUS_4_5 = "claude-opus-4-5-20251101"
-    SONNET_4_5 = "claude-sonnet-4-5-20250929"
-    HAIKU_4_5 = "claude-haiku-4-5-20251001"
-
-    # Convenience aliases (point to latest)
-    OPUS = "claude-opus-4-5-20251101"
-    SONNET = "claude-sonnet-4-5-20250929"
-    HAIKU = "claude-haiku-4-5-20251001"
+    # Aliases resolve to the latest model in each family
+    OPUS = "opus"
+    SONNET = "sonnet"
+    HAIKU = "haiku"
 
 
 class SettingSource(str, Enum):

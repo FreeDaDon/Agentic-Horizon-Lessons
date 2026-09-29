@@ -406,7 +406,7 @@ IMPORTANT: Execute every step in order, top to bottom.
   - `VITE_API_BASE_URL=http://127.0.0.1:9403`
 - Document orchestrator-specific env vars:
   - `ORCHESTRATOR_AGENT_ID=default-orchestrator`
-  - `ORCHESTRATOR_MODEL=claude-sonnet-4-5-20250929`
+  - `ORCHESTRATOR_MODEL=sonnet`
   - `ORCHESTRATOR_SYSTEM_PROMPT_PATH=./prompts/orchestrator_agent_system_prompt.md`
   - `ORCHESTRATOR_WORKING_DIR=/path/to/working/dir`
 - Copy updated `.env.sample` to `.env` if needed
@@ -675,7 +675,7 @@ uv run pytest tests/test_e2e.py  # Terminal 3
 TEST_DATABASE_URL=postgresql://user:pass@localhost:5432/orchestrator_test
 
 # Use cheaper Claude model for tests (optional)
-TEST_CLAUDE_MODEL=claude-sonnet-4-5-20250929
+TEST_CLAUDE_MODEL=sonnet
 
 # Disable expensive features during tests (if needed)
 TEST_MODE=true
@@ -809,7 +809,7 @@ The `orchestrator_chat` table already exists from `apps/orchestrator_db/migratio
 
 ### Claude SDK Integration
 The orchestrator service will use the Claude Agent SDK with:
-- Model: `claude-sonnet-4-5-20250929` (or configured model)
+- Model: `sonnet` (or configured model)
 - System prompt: Load from file or environment variable
 - MCP tools: Management tools for agent operations (create, list, command, etc.)
 - Streaming: Use async iteration over response messages

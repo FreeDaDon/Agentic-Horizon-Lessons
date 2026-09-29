@@ -21,8 +21,8 @@
         <div class="form-group">
           <label for="model">Model</label>
           <select id="model" v-model="formData.model" required>
-            <option value="claude-sonnet-4-20250514">Sonnet (Faster)</option>
-            <option value="claude-opus-4-1-20250805">Opus (Smarter)</option>
+            <option value="sonnet">Sonnet (Faster)</option>
+            <option value="opus">Opus (Smarter)</option>
           </select>
         </div>
 
@@ -88,7 +88,7 @@ export default {
 
     const formData = ref({
       title: '',
-      model: 'claude-sonnet-4-20250514',
+      model: 'sonnet',
       parent_codebase_path: '.',
       content_user_request_prompt: ''
     })
@@ -103,7 +103,7 @@ export default {
         // Reset form
         formData.value = {
           title: '',
-          model: 'claude-sonnet-4-20250514',
+          model: 'sonnet',
           parent_codebase_path: '.',
           content_user_request_prompt: ''
         }

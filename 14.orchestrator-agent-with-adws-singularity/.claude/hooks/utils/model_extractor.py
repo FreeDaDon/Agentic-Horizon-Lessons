@@ -25,7 +25,7 @@ def get_model_from_transcript(session_id: str, transcript_path: str, ttl: int = 
         ttl: Cache time-to-live in seconds (default: 60)
 
     Returns:
-        Model name string (e.g., "claude-haiku-4-5-20251001") or empty string if not found
+        Model ID string as recorded in the transcript (e.g., "claude-haiku-<version>") or empty string if not found
     """
     # Set up cache directory relative to this file location
     # __file__ is .claude/hooks/utils/model_extractor.py
@@ -103,7 +103,7 @@ def extract_model_from_transcript(transcript_path: str) -> str:
                 # {
                 #   "type": "assistant",
                 #   "message": {
-                #     "model": "claude-haiku-4-5-20251001",
+                #     "model": "claude-haiku-<version>",
                 #     "role": "assistant",
                 #     "content": [...]
                 #   }

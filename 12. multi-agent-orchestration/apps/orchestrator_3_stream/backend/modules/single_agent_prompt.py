@@ -32,7 +32,7 @@ from .logger import OrchestratorLogger
 logger = OrchestratorLogger()
 
 # Fast model for summarization (Haiku for speed and cost)
-FAST_MODEL = "claude-haiku-4-5-20251001"
+FAST_MODEL = "haiku"
 
 # Load prompt templates from files
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"

@@ -753,8 +753,8 @@ LOG_DIR=backend/logs
 CORS_ORIGINS=http://127.0.0.1:5175
 
 # Models
-ORCHESTRATOR_MODEL=claude-sonnet-4-5-20250929
-DEFAULT_AGENT_MODEL=claude-sonnet-4-5-20250929
+ORCHESTRATOR_MODEL=sonnet
+DEFAULT_AGENT_MODEL=sonnet
 
 # Paths
 ORCHESTRATOR_SYSTEM_PROMPT_PATH=backend/prompts/orchestrator_agent_system_prompt.md

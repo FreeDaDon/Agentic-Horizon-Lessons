@@ -8,7 +8,7 @@
 
 ## Executive Summary
 
-This validation confirms that **Claude Opus (claude-opus-4-5-20251101)** is correctly configured as the default model for **both** the orchestrator agent and command-level agents. The configuration cascades properly from a single source of truth (`DEFAULT_MODEL`), and the implementation allows for flexible overrides via environment variables or explicit model parameters.
+This validation confirms that **Claude Opus (opus)** is correctly configured as the default model for **both** the orchestrator agent and command-level agents. The configuration cascades properly from a single source of truth (`DEFAULT_MODEL`), and the implementation allows for flexible overrides via environment variables or explicit model parameters.
 
 ---
 
@@ -21,12 +21,12 @@ This validation confirms that **Claude Opus (claude-opus-4-5-20251101)** is corr
 #### Primary Configuration (Lines 89-95)
 ```python
 # Default model for agents (Opus is the primary model)
-DEFAULT_MODEL = "claude-opus-4-5-20251101"
+DEFAULT_MODEL = "opus"
 
-FAST_MODEL = "claude-haiku-4-5-20251001"
+FAST_MODEL = "haiku"
 
 # Available models
-AVAILABLE_MODELS = ["claude-opus-4-5-20251101", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]
+AVAILABLE_MODELS = ["opus", "sonnet", "haiku"]
 ```
 
 **Status**: ✅ **Verified** - `DEFAULT_MODEL` is set to Opus
@@ -105,10 +105,10 @@ async def create_agent_tool(args: Dict[str, Any]) -> Dict[str, Any]:
 
         # Model alias mapping
         model_aliases = {
-            "opus": "claude-opus-4-5-20251101",
-            "sonnet": "claude-sonnet-4-5-20250929",
-            "haiku": "claude-haiku-4-5-20251001",
-            "fast": "claude-haiku-4-5-20251001",
+            "opus": "opus",
+            "sonnet": "sonnet",
+            "haiku": "haiku",
+            "fast": "haiku",
         }
 
         # Resolve model alias or use as-is
@@ -157,7 +157,7 @@ options = ClaudeAgentOptions(
 ```
 ┌─────────────────────────────────────────────────────┐
 │  config.py                                          │
-│  DEFAULT_MODEL = "claude-opus-4-5-20251101"         │
+│  DEFAULT_MODEL = "opus"         │
 └─────────────────────┬───────────────────────────────┘
                       │
                       ├─────────────────────────────────┐
@@ -202,7 +202,7 @@ options = ClaudeAgentOptions(
 - Command-Level Agents → Use Opus ✅
 
 **Logic Trace**:
-1. `DEFAULT_MODEL = "claude-opus-4-5-20251101"`
+1. `DEFAULT_MODEL = "opus"`
 2. `ORCHESTRATOR_MODEL = os.getenv("ORCHESTRATOR_MODEL", DEFAULT_MODEL)` → Returns Opus
 3. `DEFAULT_AGENT_MODEL = os.getenv("DEFAULT_AGENT_MODEL", DEFAULT_MODEL)` → Returns Opus
 4. Both agent types use Opus
@@ -212,7 +212,7 @@ options = ClaudeAgentOptions(
 ---
 
 ### Scenario 2: Override Orchestrator Only
-**Setup**: `ORCHESTRATOR_MODEL=claude-sonnet-4-5-20250929` in `.env`
+**Setup**: `ORCHESTRATOR_MODEL=sonnet` in `.env`
 
 **Expected Behavior**:
 - Orchestrator Agent → Uses Sonnet (overridden)
@@ -228,7 +228,7 @@ options = ClaudeAgentOptions(
 ---
 
 ### Scenario 3: Override Command Agents Only
-**Setup**: `DEFAULT_AGENT_MODEL=claude-haiku-4-5-20251001` in `.env`
+**Setup**: `DEFAULT_AGENT_MODEL=haiku` in `.env`
 
 **Expected Behavior**:
 - Orchestrator Agent → Uses Opus (default)
@@ -253,7 +253,7 @@ options = ClaudeAgentOptions(
 
 **Logic Trace**:
 1. Line 126: `model_input = args.get("model", config.DEFAULT_AGENT_MODEL)` → Returns "sonnet"
-2. Line 138-142: Alias resolution converts "sonnet" → "claude-sonnet-4-5-20250929"
+2. Line 138-142: Alias resolution converts "sonnet" → "sonnet"
 3. Line 699: `model=model or config.DEFAULT_AGENT_MODEL` → Uses resolved Sonnet
 4. This agent uses Sonnet, others use Opus
 
@@ -269,7 +269,7 @@ options = ClaudeAgentOptions(
 
 **Logic Trace**:
 1. Line 126: `model_input = args.get("model", config.DEFAULT_AGENT_MODEL)` → Returns "opus"
-2. Line 138-142: Alias resolution converts "opus" → "claude-opus-4-5-20251101"
+2. Line 138-142: Alias resolution converts "opus" → "opus"
 3. Line 699: Uses resolved Opus model
 4. Agent explicitly uses Opus (same as default, but via alias)
 
@@ -342,7 +342,7 @@ model=model or config.DEFAULT_AGENT_MODEL
 **Summary**:
 1. ✅ **Orchestrator Agent**: Uses `config.ORCHESTRATOR_MODEL` which defaults to Opus
 2. ✅ **Command-Level Agents**: Use `config.DEFAULT_AGENT_MODEL` which defaults to Opus
-3. ✅ **Single Source of Truth**: Both cascade from `DEFAULT_MODEL = "claude-opus-4-5-20251101"`
+3. ✅ **Single Source of Truth**: Both cascade from `DEFAULT_MODEL = "opus"`
 4. ✅ **Override Flexibility**: Environment variables allow independent overrides
 5. ✅ **Per-Agent Override**: Individual agents can specify models via parameter
 6. ✅ **Alias Support**: "opus", "sonnet", "haiku", "fast" aliases work correctly
@@ -355,7 +355,7 @@ model=model or config.DEFAULT_AGENT_MODEL
 
 | Component | Configuration | Default Value | Source |
 |-----------|---------------|---------------|--------|
-| **DEFAULT_MODEL** | `config.py:90` | `"claude-opus-4-5-20251101"` | Hardcoded |
+| **DEFAULT_MODEL** | `config.py:90` | `"opus"` | Hardcoded |
 | **ORCHESTRATOR_MODEL** | `config.py:102` | `DEFAULT_MODEL` (Opus) | Env var fallback |
 | **DEFAULT_AGENT_MODEL** | `config.py:146` | `DEFAULT_MODEL` (Opus) | Env var fallback |
 | **Orchestrator Usage** | `orchestrator_service.py:242` | `config.ORCHESTRATOR_MODEL` (Opus) | Config reference |
@@ -373,10 +373,10 @@ The `.env.sample` file has been updated to document the override options:
 ```bash
 # Model Configuration (Optional)
 # Override default model for orchestrator agent
-# ORCHESTRATOR_MODEL=claude-opus-4-5-20251101
+# ORCHESTRATOR_MODEL=opus
 
 # Override default model for command-level agents
-# DEFAULT_AGENT_MODEL=claude-opus-4-5-20251101
+# DEFAULT_AGENT_MODEL=opus
 ```
 
 ### 🧪 Suggested Manual Testing
@@ -385,7 +385,7 @@ To verify in a live environment:
 1. **Test Default Behavior**:
    ```bash
    # Start orchestrator, check logs for model name
-   # Should show: claude-opus-4-5-20251101
+   # Should show: opus
    ```
 
 2. **Test Agent Creation**:
@@ -399,7 +399,7 @@ To verify in a live environment:
    ```python
    # Create agent with alias
    create_agent(name="test", model="sonnet", system_prompt="...")
-   # Should resolve to claude-sonnet-4-5-20250929
+   # Should resolve to sonnet
    ```
 
 ---

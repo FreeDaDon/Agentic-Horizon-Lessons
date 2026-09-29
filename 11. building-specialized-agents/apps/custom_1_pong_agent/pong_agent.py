@@ -74,7 +74,7 @@ async def main():
     # Step 1: Configure the agent with a system prompt
     # Load the system prompt from the markdown file
     system_prompt = load_system_prompt()
-    model = "claude-sonnet-4-20250514"
+    model = "sonnet"
 
     options = ClaudeAgentOptions(
         system_prompt=system_prompt,

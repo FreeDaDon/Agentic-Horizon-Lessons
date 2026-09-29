@@ -38,7 +38,7 @@ class TestAgentExpertInitialization:
     def test_agent_initializes_without_error(self):
         """Agent should initialize successfully with API key."""
         agent = ShoppingAgentExpert()
-        assert agent.model == "claude-sonnet-4-20250514"
+        assert agent.model == "haiku"
 
     def test_system_prompt_template_loaded(self):
         """Agent should load system prompt template."""

@@ -60,7 +60,7 @@ The orchestrator database currently has **6 tables** that manage multi-agent orc
 | `id` | UUID | NO | `gen_random_uuid()` | Primary key - unique agent identifier |
 | `orchestrator_agent_id` | UUID | NO | - | FK to `orchestrator_agents(id)` ON DELETE CASCADE |
 | `name` | TEXT | NO | - | Agent name (unique per orchestrator) |
-| `model` | TEXT | NO | - | Claude model ID (e.g., `claude-sonnet-4-5-20250929`) |
+| `model` | TEXT | NO | - | Claude model ID (e.g., `sonnet`) |
 | `system_prompt` | TEXT | YES | NULL | Agent custom system prompt |
 | `working_dir` | TEXT | YES | NULL | Agent working directory path |
 | `git_worktree` | TEXT | YES | NULL | Git worktree path if using worktrees |

@@ -40,9 +40,9 @@ Create a new Agent with specified configuration.
 - **name**: Unique identifier for the agent (required)
 - **system_prompt**: Instructions defining the agent's role and behavior (optional if using template)
 - **model**: Model to use (default: opus, or from template). Supports aliases:
-  - `opus` → claude-opus-4-5-20251101 (highest capability, default)
-  - `sonnet` → claude-sonnet-4-5-20250929 (balanced performance, secondary, do not prefer)
-  - `haiku` or `fast` → claude-haiku-4-5-20251001 (faster, lower cost)
+  - `opus` → opus (highest capability, default)
+  - `sonnet` → sonnet (balanced performance, secondary, do not prefer)
+  - `haiku` or `fast` → haiku (faster, lower cost)
   - Or pass full model name directly
 - **subagent_template**: Name of a subagent template to use (optional). If provided, the template's system prompt, tools, and model will be applied automatically. See "Available Subagent Templates" section above for available templates.
 

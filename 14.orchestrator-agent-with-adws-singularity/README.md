@@ -475,7 +475,7 @@ graph TB
     end
 
     subgraph "AI Layer (Claude SDK)"
-        Orchestrator[Orchestrator Agent<br/>Claude Sonnet 4.5]
+        Orchestrator[Orchestrator Agent<br/>Claude Sonnet]
         CommandAgents[Command Agents<br/>Sonnet/Haiku]
         Tools[Management Tools<br/>MCP Server]
     end
@@ -593,7 +593,7 @@ Frontend (Vue)
 
 The system uses a **meta-agent pattern**:
 
-1. **Orchestrator Agent** (Claude Sonnet 4.5) - The "conductor"
+1. **Orchestrator Agent** (Claude Sonnet) - The "conductor"
    - Interprets natural language commands from you
    - Has access to 8 management tools via MCP server
    - Creates, commands, and monitors other agents
@@ -766,7 +766,7 @@ FRONTEND_HOST=127.0.0.1
 FRONTEND_PORT=5175
 
 # Orchestrator
-ORCHESTRATOR_MODEL=claude-sonnet-4-5-20250929
+ORCHESTRATOR_MODEL=sonnet
 ORCHESTRATOR_WORKING_DIR=/path/to/project
 
 # Database

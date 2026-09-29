@@ -108,8 +108,8 @@ async def main():
         mcp_servers={"echo": echo_server},
         allowed_tools=["mcp__echo__echo"],  # Format: mcp__<server>__<tool>
         system_prompt=system_prompt,
-        model="claude-3-5-haiku-20241022",
-        # model="claude-sonnet-4-20250514",
+        model="haiku",
+        # model="sonnet",
     )
 
     # Use ClaudeSDKClient for custom tools

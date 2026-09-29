@@ -1,7 +1,7 @@
 # Code Review Report: Opus Model Update
 
 **Generated**: 2025-12-09T14:45:00Z
-**Reviewed Work**: Update default model from Sonnet to Opus (claude-opus-4-5-20251101)
+**Reviewed Work**: Update default model from Sonnet to Opus (opus)
 **Git Diff Summary**: 2 files changed, 5 insertions(+), 3 deletions(-)
 **Verdict**: ✅ PASS
 
@@ -50,8 +50,8 @@ The opus model update implementation has been successfully completed with all pl
 **Current Code**:
 ```markdown
 - **model**: Model to use (default: sonnet, or from template). Supports aliases:
-  - `sonnet` → claude-sonnet-4-5-20250929 (balanced performance)
-  - `haiku` or `fast` → claude-3-5-haiku-20241022 (faster, lower cost)
+  - `sonnet` → sonnet (balanced performance)
+  - `haiku` or `fast` → haiku (faster, lower cost)
   - Or pass full model name directly
 ```
 
@@ -59,9 +59,9 @@ The opus model update implementation has been successfully completed with all pl
 1. **Update documentation to reflect opus as default** (Preferred)
    ```markdown
    - **model**: Model to use (default: opus, or from template). Supports aliases:
-     - `opus` → claude-opus-4-5-20251101 (highest capability, default)
-     - `sonnet` → claude-sonnet-4-5-20250929 (balanced performance, secondary, do not prefer)
-     - `haiku` or `fast` → claude-haiku-4-5-20251001 (faster, lower cost)
+     - `opus` → opus (highest capability, default)
+     - `sonnet` → sonnet (balanced performance, secondary, do not prefer)
+     - `haiku` or `fast` → haiku (faster, lower cost)
      - Or pass full model name directly
    ```
    - Rationale: Keeps user-facing documentation accurate and helps users understand the model hierarchy
@@ -85,10 +85,10 @@ Only documents `DATABASE_URL`, `ANTHROPIC_API_KEY`, and `DEFAULT_WORKING_DIR`.
    ```bash
    # Model Configuration (Optional)
    # Override default model for orchestrator agent
-   # ORCHESTRATOR_MODEL=claude-opus-4-5-20251101
+   # ORCHESTRATOR_MODEL=opus
 
    # Override default model for command-level agents
-   # DEFAULT_AGENT_MODEL=claude-opus-4-5-20251101
+   # DEFAULT_AGENT_MODEL=opus
    ```
    - Rationale: Users need to know these override options exist for cost control or testing purposes
 
@@ -106,13 +106,13 @@ Only documents `DATABASE_URL`, `ANTHROPIC_API_KEY`, and `DEFAULT_WORKING_DIR`.
 
 **Current Code**:
 ```python
-        model: Claude model ID (e.g., "claude-sonnet-4-5-20250929")
+        model: Claude model ID (e.g., "sonnet")
 ```
 
 **Recommended Solutions**:
 1. **Update example to opus** (Preferred)
    ```python
-        model: Claude model ID (e.g., "claude-opus-4-5-20251101")
+        model: Claude model ID (e.g., "opus")
    ```
    - Rationale: Minor consistency improvement, demonstrates the current default
 
@@ -124,14 +124,14 @@ Based on the implementation plan's acceptance criteria:
 
 | Criterion                                  | Status   | Evidence                                                                                                                                                                    |
 | ------------------------------------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| ✅ Orchestrator uses Opus by default        | **PASS** | `DEFAULT_MODEL = "claude-opus-4-5-20251101"` in config.py (line 90)<br>`ORCHESTRATOR_MODEL = os.getenv("ORCHESTRATOR_MODEL", DEFAULT_MODEL)` (line 102)                     |
+| ✅ Orchestrator uses Opus by default        | **PASS** | `DEFAULT_MODEL = "opus"` in config.py (line 90)<br>`ORCHESTRATOR_MODEL = os.getenv("ORCHESTRATOR_MODEL", DEFAULT_MODEL)` (line 102)                     |
 | ✅ Command agents use Opus by default       | **PASS** | `DEFAULT_AGENT_MODEL = os.getenv("DEFAULT_AGENT_MODEL", DEFAULT_MODEL)` in config.py (line 146)<br>agent_manager.py uses `config.DEFAULT_AGENT_MODEL` as default (line 126) |
-| ✅ 'opus' alias resolves to full model name | **PASS** | `"opus": "claude-opus-4-5-20251101"` added to model_aliases (agent_manager.py line 131)                                                                                     |
+| ✅ 'opus' alias resolves to full model name | **PASS** | `"opus": "opus"` added to model_aliases (agent_manager.py line 131)                                                                                     |
 | ✅ Full model name works                    | **PASS** | Alias resolution uses `.get(model_input.lower(), model_input)` pattern - full names pass through                                                                            |
-| ✅ 'sonnet' alias still works               | **PASS** | `"sonnet": "claude-sonnet-4-5-20250929"` preserved in model_aliases (line 132)                                                                                              |
+| ✅ 'sonnet' alias still works               | **PASS** | `"sonnet": "sonnet"` preserved in model_aliases (line 132)                                                                                              |
 | ✅ 'haiku'/'fast' aliases still work        | **PASS** | Both aliases preserved and unchanged in model_aliases (lines 133-134)                                                                                                       |
 | ✅ Environment variable override works      | **PASS** | `ORCHESTRATOR_MODEL` and `DEFAULT_AGENT_MODEL` both support env var overrides with `os.getenv()`                                                                            |
-| ✅ FAST_MODEL unchanged                     | **PASS** | `FAST_MODEL = "claude-haiku-4-5-20251001"` unchanged (config.py line 92)                                                                                                    |
+| ✅ FAST_MODEL unchanged                     | **PASS** | `FAST_MODEL = "haiku"` unchanged (config.py line 92)                                                                                                    |
 
 ---
 
@@ -154,15 +154,15 @@ Based on the implementation plan's acceptance criteria:
 ```diff
 config.py:
 + # Default model for agents (Opus is the primary model)
-+ DEFAULT_MODEL = "claude-opus-4-5-20251101"
++ DEFAULT_MODEL = "opus"
 - # Default model for agents
-- DEFAULT_MODEL = "claude-sonnet-4-5-20250929"
+- DEFAULT_MODEL = "sonnet"
 
-+ AVAILABLE_MODELS = ["claude-opus-4-5-20251101", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]
-- AVAILABLE_MODELS = ["claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]
++ AVAILABLE_MODELS = ["opus", "sonnet", "haiku"]
+- AVAILABLE_MODELS = ["sonnet", "haiku"]
 
 agent_manager.py:
-+ "opus": "claude-opus-4-5-20251101",
++ "opus": "opus",
 ```
 
 **Analysis**: Clean, focused changes with no side effects. The diff shows disciplined implementation that touched only what was necessary.
@@ -217,7 +217,7 @@ While no blockers exist, the following manual tests are recommended before consi
 
 1. **Smoke Test: Orchestrator Startup**
    - Start orchestrator without env vars
-   - Verify logs show: `model: claude-opus-4-5-20251101`
+   - Verify logs show: `model: opus`
 
 2. **Alias Resolution Test**
    - Create agent with `model: "opus"` → verify resolves to full name
@@ -225,7 +225,7 @@ While no blockers exist, the following manual tests are recommended before consi
    - Create agent with `model: "haiku"` → verify still works
 
 3. **Environment Override Test**
-   - Set `ORCHESTRATOR_MODEL=claude-sonnet-4-5-20250929`
+   - Set `ORCHESTRATOR_MODEL=sonnet`
    - Verify orchestrator uses Sonnet instead of Opus
 
 4. **Fast Operations Unchanged**

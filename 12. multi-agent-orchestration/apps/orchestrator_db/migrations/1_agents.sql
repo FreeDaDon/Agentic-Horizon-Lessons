@@ -35,7 +35,7 @@ COMMENT ON TABLE agents IS 'Agent registry and configuration for managed agents 
 COMMENT ON COLUMN agents.id IS 'Unique agent identifier';
 COMMENT ON COLUMN agents.orchestrator_agent_id IS 'Foreign key to orchestrator_agents table (required - agents belong to one orchestrator)';
 COMMENT ON COLUMN agents.name IS 'Agent name (unique per orchestrator)';
-COMMENT ON COLUMN agents.model IS 'Claude model ID (e.g., claude-sonnet-4-5-20250929)';
+COMMENT ON COLUMN agents.model IS 'Claude model ID (e.g., sonnet)';
 COMMENT ON COLUMN agents.system_prompt IS 'Agent custom system prompt';
 COMMENT ON COLUMN agents.working_dir IS 'Agent working directory path';
 COMMENT ON COLUMN agents.git_worktree IS 'Git worktree path if using worktrees';

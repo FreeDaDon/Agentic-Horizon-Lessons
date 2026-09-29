@@ -198,7 +198,7 @@ class AgentStatusResponse(BaseModel):
 class AgentConfiguration(BaseModel):
     """Configuration for an individual agent"""
 
-    model: str = Field("claude-sonnet-4-20250514", description="Model to use")
+    model: str = Field("sonnet", description="Model to use")
     max_turns: int = Field(10, description="Maximum conversation turns")
     allowed_tools: List[str] = Field(..., description="List of allowed tool names")
     system_prompt_path: str = Field(..., description="Path to system prompt file")

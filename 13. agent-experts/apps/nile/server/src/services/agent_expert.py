@@ -319,9 +319,9 @@ class ShoppingAgentExpert:
             logger.error("ANTHROPIC_API_KEY is not set!")
             raise ValueError("ANTHROPIC_API_KEY is required")
 
-        # self.model = "claude-opus-4-5-20251101"
-        # self.model = "claude-sonnet-4-5-20250929"
-        self.model = "claude-haiku-4-5-20251001"
+        # self.model = "opus"
+        # self.model = "sonnet"
+        self.model = "haiku"
 
         logger.info(f"Model: {self.model}")
 

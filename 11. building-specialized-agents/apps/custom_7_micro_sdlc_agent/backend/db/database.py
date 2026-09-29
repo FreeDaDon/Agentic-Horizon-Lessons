@@ -33,7 +33,7 @@ async def init_database():
                 stage TEXT DEFAULT 'idle',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                model TEXT DEFAULT 'claude-sonnet-4-20250514',
+                model TEXT DEFAULT 'sonnet',
                 agent TEXT DEFAULT 'claude_code',
 
                 plan_claude_code_session_id TEXT,
@@ -58,7 +58,7 @@ async def init_database():
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 codebase_path TEXT DEFAULT '.',
                 available_codebases TEXT DEFAULT '[]',
-                available_models TEXT DEFAULT '["claude-sonnet-4-20250514", "claude-opus-4-1-20250805"]'
+                available_models TEXT DEFAULT '["sonnet", "opus"]'
             )
         """)
 
@@ -69,7 +69,7 @@ async def init_database():
             await db.execute("""
                 INSERT INTO session_information (codebase_path, available_codebases, available_models)
                 VALUES (?, ?, ?)
-            """, (".", '[".", "./apps"]', '["claude-sonnet-4-20250514", "claude-opus-4-1-20250805"]'))
+            """, (".", '[".", "./apps"]', '["sonnet", "opus"]'))
 
         await db.commit()
 
@@ -77,7 +77,7 @@ async def init_database():
 async def create_ticket(
     title: str,
     content_user_request_prompt: str,
-    model: str = "claude-sonnet-4-20250514",
+    model: str = "sonnet",
     parent_codebase_path: str = None
 ) -> int:
     """Create a new ticket"""
@@ -308,5 +308,5 @@ async def get_session_info() -> Dict[str, Any]:
         return {
             'codebase_path': '.',
             'available_codebases': ['.', './apps'],
-            'available_models': ['claude-sonnet-4-20250514', 'claude-opus-4-1-20250805']
+            'available_models': ['sonnet', 'opus']
         }

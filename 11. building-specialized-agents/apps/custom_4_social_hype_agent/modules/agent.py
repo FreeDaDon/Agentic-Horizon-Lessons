@@ -103,7 +103,7 @@ class SocialHypeAgent:
 
         self.claude_options = ClaudeAgentOptions(
             system_prompt=self.analysis_prompt,
-            model="claude-sonnet-4-20250514",
+            model="sonnet",
             mcp_servers={"tools": self.tools_server},
             allowed_tools=["mcp__tools__submit_analysis", "mcp__tools__notify"],
             disallowed_tools=[

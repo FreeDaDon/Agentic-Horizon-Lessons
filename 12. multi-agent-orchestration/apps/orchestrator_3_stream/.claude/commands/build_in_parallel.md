@@ -1,5 +1,5 @@
 ---
-model: claude-sonnet-4-5-20250929
+model: sonnet
 description: Build the codebase in parallel by delegating file creation to build-agents
 argument-hint: [path-to-plan]
 ---

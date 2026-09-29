@@ -303,7 +303,7 @@ async def run_calculator_repl():
                     "KillShell",  # System tools
                 ],
                 system_prompt=calculator_system_prompt,
-                model="claude-sonnet-4-20250514",  # Fast model for calculations
+                model="sonnet",  # Fast model for calculations
                 resume=current_session_id,  # KEY: Resume existing session for continuity!
             )
 

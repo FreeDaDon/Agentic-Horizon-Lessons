@@ -81,7 +81,7 @@ def _init_claude_agent(self):
     # Build ClaudeAgentOptions
     options_dict = {
         "system_prompt": placeholder_system_prompt,
-        "model": "claude-haiku-4-5-20251001",
+        "model": "haiku",
         "cwd": self.working_dir,
     }
 
@@ -405,7 +405,7 @@ from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions
 async def test_session_capture():
     client = ClaudeSDKClient(ClaudeAgentOptions(
         system_prompt="You are a helpful assistant",
-        model="claude-haiku-4-5-20251001",
+        model="haiku",
     ))
 
     async with client:

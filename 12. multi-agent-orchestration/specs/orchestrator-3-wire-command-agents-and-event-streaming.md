@@ -177,7 +177,7 @@ Database (agents, agent_logs, prompts tables)
 
 - **apps/orchestrator_3_stream/backend/modules/config.py** (Lines: 137+)
   - Why: Add agent-specific defaults
-  - Add: `DEFAULT_AGENT_MODEL` (default "claude-sonnet-4-5-20250929")
+  - Add: `DEFAULT_AGENT_MODEL` (default "sonnet")
   - Add: `AGENT_SYSTEM_PROMPT_TEMPLATE_PATH` (default "./prompts/managed_agent_system_prompt_template.md")
   - Add: `MAX_AGENT_TURNS` (default 500)
 
@@ -988,7 +988,7 @@ async def test_agent():
     # Create test agent
     agent_id = await create_agent(
         name=f"test-agent-{uuid4()}",
-        model="claude-sonnet-4-5-20250929",
+        model="sonnet",
         system_prompt="You are a test agent. Respond concisely.",
         working_dir="/tmp",
         metadata={}
@@ -1372,7 +1372,7 @@ Each agent tracks tokens independently:
 - `output_tokens` - Cumulative output across all commands
 - `total_cost` - Cumulative USD cost
 
-Context window limit (200K tokens for Sonnet 4):
+Context window limit (200K tokens for Sonnet):
 - Monitor via `input_tokens + output_tokens`
 - When agent reaches 80%, suggest `/compact` or reset
 - PreCompact hook resets counters to show new compressed size
@@ -1489,7 +1489,7 @@ If new libraries needed:
 Add to `.env` and `.env.sample`:
 ```bash
 # Agent Configuration
-DEFAULT_AGENT_MODEL=claude-sonnet-4-5-20250929
+DEFAULT_AGENT_MODEL=sonnet
 AGENT_SYSTEM_PROMPT_TEMPLATE_PATH=./backend/prompts/managed_agent_system_prompt_template.md
 MAX_AGENT_TURNS=500
 

@@ -749,7 +749,7 @@ async def create_agent(
     Args:
         orchestrator_agent_id: UUID of the orchestrator agent that owns this command agent
         name: Agent identifier/name (unique per orchestrator)
-        model: Claude model ID (e.g., "claude-sonnet-4-5-20250929")
+        model: Claude model ID (e.g., "sonnet")
         system_prompt: Agent's custom system prompt
         working_dir: Agent's working directory path
         metadata: Optional JSONB metadata (allowed_tools, disallowed_tools, etc.)

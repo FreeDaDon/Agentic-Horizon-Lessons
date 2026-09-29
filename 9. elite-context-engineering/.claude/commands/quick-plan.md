@@ -1,7 +1,7 @@
 ---
 allowed-tools: Read, Write, Edit, Glob, Grep
 description: Creates a concise engineering implementation plan based on user requirements and saves it to specs directory
-model: claude-opus-4-1-20250805
+model: opus
 ---
 
 # Purpose
