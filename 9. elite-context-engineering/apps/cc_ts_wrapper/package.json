@@ -1,0 +1,19 @@
+{
+  "name": "cc-ts-wrapper",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run cli.ts",
+    "build": "bun build cli.ts --outdir dist --target bun",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-code": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "bun-types": "latest",
+    "typescript": "latest"
+  }
+}

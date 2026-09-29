@@ -1,0 +1,21 @@
+[project]
+name = "social-hype-agent"
+version = "1.0.0"
+description = "Social media hype tracker using Bluesky WebSocket firehose - Level 1.3"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "claude-agent-sdk",
+    "websockets>=12.0",
+    "rich>=13.0.0",
+    "asyncio-mqtt>=0.16.0",
+    "python-dotenv>=1.0.0",
+    "elevenlabs>=2.16.0",
+]
+
+[tool.uv]
+dev-dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

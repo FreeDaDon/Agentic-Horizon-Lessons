@@ -1,0 +1,17 @@
+[project]
+name = "echo-agent"
+version = "1.0.0"
+description = "Echo agent with transformations - Level 1.1"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "claude-agent-sdk",
+    "rich>=13.0.0",
+]
+
+[tool.uv]
+dev-dependencies = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

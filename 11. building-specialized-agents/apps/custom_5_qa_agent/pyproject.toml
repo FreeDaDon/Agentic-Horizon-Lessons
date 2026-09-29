@@ -1,0 +1,15 @@
+[project]
+name = "qa-agent"
+version = "0.1.0"
+description = "QA Agent - A specialized agent for codebase question answering"
+requires-python = ">=3.10"
+dependencies = [
+    "claude-agent-sdk",
+    "rich>=13.5.0",
+]
+
+[project.scripts]
+qa-agent = "qa_agent:main"
+
+[tool.uv]
+dev-dependencies = []

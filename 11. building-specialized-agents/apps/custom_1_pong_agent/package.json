@@ -1,0 +1,18 @@
+{
+  "name": "pong-agent",
+  "version": "1.0.0",
+  "description": "Simplest pong agent - Level 0.1",
+  "type": "module",
+  "scripts": {
+    "start": "bun run pong_agent.ts",
+    "dev": "bun run pong_agent.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-code": "^1.0.117",
+    "boxen": "^8.0.1",
+    "chalk": "^5.6.2"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}

@@ -1,0 +1,23 @@
+[project]
+name = "ultra-stream-agent"
+version = "0.1.0"
+description = "Dual-agent system for processing and inspecting streaming JSONL logs"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "claude-agent-sdk",
+    "fastapi",
+    "uvicorn[standard]",
+    "websockets",
+    "rich",
+    "pydantic",
+    "python-dotenv",
+    "aiofiles",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["modules", "backend"]

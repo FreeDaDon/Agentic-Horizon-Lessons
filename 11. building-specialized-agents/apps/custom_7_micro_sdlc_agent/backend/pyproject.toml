@@ -1,0 +1,18 @@
+[project]
+name = "micro_sdlc_agent"
+version = "1.0.0"
+description = "Micro SDLC Agent - Plan, Build, Review workflow orchestrator"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "websockets",
+    "python-multipart",
+    "aiosqlite",
+    "claude-agent-sdk",
+    "rich",
+    "pydantic",
+]
+
+[tool.uv]
+dev-dependencies = []
