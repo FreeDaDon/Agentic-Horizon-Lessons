@@ -46,7 +46,7 @@ pytest_app "11. building-specialized-agents/apps/custom_5_qa_agent" test_inline_
 
 step "pytest: 14.orchestrator-agent-with-adws-singularity/adws (stdlib-only ADW modules)"
 (cd "14.orchestrator-agent-with-adws-singularity/adws" && uv run --no-project --quiet --with pytest \
-  pytest -q -p no:cacheprovider adw_tests/test_adw_review.py)
+  pytest -q -p no:cacheprovider adw_tests/test_adw_review.py adw_tests/test_adw_plan.py)
 
 step "pytest: tests/ (repo-level guard hook tests)"
 uv run --no-project --quiet --with pytest pytest -q -p no:cacheprovider tests
