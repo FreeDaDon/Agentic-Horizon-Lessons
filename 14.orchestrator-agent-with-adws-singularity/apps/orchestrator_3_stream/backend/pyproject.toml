@@ -16,7 +16,8 @@ dependencies = [
 ]
 
 [tool.uv]
-dev-dependencies = []
+# httpx: fastapi.testclient needs it (tests/test_autocomplete_endpoints.py)
+dev-dependencies = ["httpx"]
 
 [tool.pytest.ini_options]
 markers = [
