@@ -55,7 +55,7 @@ step "bun + tsc: 11. building-specialized-agents/apps/custom_1_pong_agent (TypeS
 
 step "bun + tsc: 9. elite-context-engineering/apps/cc_ts_wrapper (TypeScript)"
 (cd "9. elite-context-engineering/apps/cc_ts_wrapper" && npx -y bun@1 install --frozen-lockfile --silent \
-  && npx -y bun@1 run typecheck && echo "cc_ts_wrapper type-checks")
+  && npx -y bun@1 run typecheck && echo "cc_ts_wrapper type-checks" && npx -y bun@1 test)
 
 step "pytest: tests/ (repo-level guard hook tests)"
 uv run --no-project --quiet --with pytest pytest -q -p no:cacheprovider tests

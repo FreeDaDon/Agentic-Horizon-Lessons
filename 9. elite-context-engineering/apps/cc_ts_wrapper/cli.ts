@@ -27,6 +27,15 @@ register_prompt("/refactor", {
   promptTemplate: "Refactor the following code: {USER_PROMPT}"
 });
 
+// Only the flags that were given: a key set to undefined would overwrite the defaults when merged
+export function settingsFromFlags(values: Record<string, unknown>): ClaudeSettings {
+  const settings: ClaudeSettings = {};
+  if (values["max-turns"]) settings.maxTurns = parseInt(values["max-turns"] as string);
+  if (typeof values["system-prompt"] === "string") settings.systemPrompt = values["system-prompt"];
+  if (typeof values.tools === "string") settings.allowedTools = values.tools.split(",");
+  return settings;
+}
+
 async function main() {
   const { values, positionals } = parseArgs({
     args: Bun.argv.slice(2),
@@ -83,11 +92,7 @@ Examples:
     process.exit(1);
   }
 
-  const settings: ClaudeSettings = {
-    maxTurns: values["max-turns"] ? parseInt(values["max-turns"] as string) : undefined,
-    systemPrompt: typeof values["system-prompt"] === "string" ? values["system-prompt"] : undefined,
-    allowedTools: typeof values.tools === "string" ? values.tools.split(",") : undefined,
-  };
+  const settings = settingsFromFlags(values);
 
   let result;
   
