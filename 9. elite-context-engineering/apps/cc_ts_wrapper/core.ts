@@ -1,4 +1,4 @@
-import { query } from "@anthropic-ai/claude-code";
+import { query } from "@anthropic-ai/claude-agent-sdk";
 import type {
   ClaudeSettings,
   AdhocPromptOptions,
@@ -29,7 +29,7 @@ export async function adhoc_prompt(
       options: {
         abortController,
         maxTurns: mergedSettings.maxTurns,
-        customSystemPrompt: mergedSettings.systemPrompt,
+        systemPrompt: mergedSettings.systemPrompt,
         allowedTools: mergedSettings.allowedTools,
         continue: mergedSettings.continue,
         resume: mergedSettings.resume,
