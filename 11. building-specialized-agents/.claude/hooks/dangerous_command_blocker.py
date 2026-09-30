@@ -49,6 +49,9 @@ CRITICAL_PATHS = [
     '/sys',
     '/var',
     os.path.expanduser('~'),
+    '~',
+    '$HOME',
+    '${HOME}',
 ]
 
 
@@ -62,15 +65,18 @@ def is_dangerous_command(command: str) -> tuple[bool, str]:
         if re.search(pattern, command, re.IGNORECASE):
             return True, f"Command matches dangerous pattern: {pattern}"
 
+    # Flags are case-insensitive here: rm -R is the same as rm -r
+    lowered = command.lower()
+
     # Check for rm on critical paths
     if 'rm' in command:
         for critical_path in CRITICAL_PATHS:
-            if critical_path in command and '-r' in command:
+            if critical_path in command and '-r' in lowered:
                 return True, f"Recursive removal targeting critical path: {critical_path}"
 
     # Check for multiple wildcards with force/recursive
     if 'rm' in command and ('*' in command or '?' in command):
-        if '-rf' in command or '-fr' in command or ('-r' in command and '-f' in command):
+        if '-rf' in lowered or '-fr' in lowered or ('-r' in lowered and '-f' in lowered):
             wildcard_count = command.count('*') + command.count('?')
             if wildcard_count > 1:
                 return True, "Multiple wildcards with force/recursive flags"

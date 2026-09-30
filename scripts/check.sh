@@ -39,6 +39,9 @@ for lesson in "13. agent-experts" "14.orchestrator-agent-with-adws-singularity";
     tests/test_slash_command_discovery.py tests/test_autocomplete_agent.py tests/test_autocomplete_endpoints.py
 done
 
+step "pytest: tests/ (repo-level guard hook tests)"
+uv run --no-project --quiet --with pytest pytest -q -p no:cacheprovider tests
+
 step "Tests left the working tree unchanged"
 tree_after=$(git status --porcelain)
 if [[ "$tree_before" != "$tree_after" ]]; then
