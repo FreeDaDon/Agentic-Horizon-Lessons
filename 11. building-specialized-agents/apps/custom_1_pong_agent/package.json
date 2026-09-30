@@ -8,7 +8,7 @@
     "dev": "bun run pong_agent.ts"
   },
   "dependencies": {
-    "@anthropic-ai/claude-code": "^1.0.117",
+    "@anthropic-ai/claude-agent-sdk": "^0.3.286",
     "boxen": "^8.0.1",
     "chalk": "^5.6.2"
   },

@@ -5,7 +5,7 @@
  * This demonstrates the absolute basics of the Claude Agent SDK.
  */
 
-import { query, Options, SDKAssistantMessage, SDKResultMessage } from '@anthropic-ai/claude-code';
+import { query, Options, SDKAssistantMessage, SDKResultMessage } from '@anthropic-ai/claude-agent-sdk';
 import chalk from 'chalk';
 import boxen from 'boxen';
 
@@ -37,7 +37,7 @@ async function main() {
   const model = "sonnet"; // Fast model for simple tasks
 
   const options: Options = {
-    customSystemPrompt: systemPrompt,
+    systemPrompt: systemPrompt,
     model: model
   };
 
