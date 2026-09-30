@@ -52,6 +52,7 @@ from adw_modules.adw_logging import (
     update_adw_status,
 )
 from adw_modules.adw_summarizer import summarize_event
+from adw_modules.adw_review import parse_verdict
 from adw_modules.adw_websockets import broadcast_adw_event_summary_update
 from adw_modules.adw_agent_sdk import (
     query_to_completion,
@@ -866,14 +867,8 @@ async def run_review_step(
 
         duration_ms = int((time.time() - step_start_time) * 1000)
 
-        # Extract verdict from result
-        verdict = None
-        if result.success and result.result:
-            result_text = result.result.upper()
-            if "PASS" in result_text and "FAIL" not in result_text:
-                verdict = "PASS"
-            elif "FAIL" in result_text:
-                verdict = "FAIL"
+        # Extract verdict from result (None when the review states neither)
+        verdict = parse_verdict(result.result) if result.success else None
 
         # Update agent with session_id and usage
         await update_agent(
