@@ -24,6 +24,9 @@ for f in files:
 print(f"{len(files)} files parsed")
 '
 
+# Tests must not modify the working tree (tracked or untracked files).
+tree_before=$(git status --porcelain)
+
 pytest_app() {
   local dir=$1; shift
   step "pytest: $dir"
@@ -35,5 +38,13 @@ for lesson in "13. agent-experts" "14.orchestrator-agent-with-adws-singularity";
   pytest_app "$lesson/apps/orchestrator_3_stream/backend" \
     tests/test_slash_command_discovery.py tests/test_autocomplete_agent.py tests/test_autocomplete_endpoints.py
 done
+
+step "Tests left the working tree unchanged"
+tree_after=$(git status --porcelain)
+if [[ "$tree_before" != "$tree_after" ]]; then
+  echo "the tests changed these paths:"
+  diff <(echo "$tree_before") <(echo "$tree_after") || true
+  exit 1
+fi
 
 step "All offline checks passed"
