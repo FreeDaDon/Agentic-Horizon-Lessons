@@ -31,7 +31,7 @@ tree_before=$(git status --porcelain)
 pytest_app() {
   local dir=$1; shift
   step "pytest: $dir"
-  (cd "$dir" && uv run --frozen --quiet --with pytest --with pytest-asyncio \
+  (cd "$dir" && uv run --frozen --exact --quiet --with pytest --with pytest-asyncio \
     pytest -q -p no:cacheprovider --disable-warnings "$@")
 }
 
