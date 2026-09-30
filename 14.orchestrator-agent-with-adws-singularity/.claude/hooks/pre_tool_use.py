@@ -110,6 +110,12 @@ def main():
                 )
                 sys.exit(2)  # Exit code 2 blocks tool call and shows error to Claude
 
+    except Exception as e:
+        # Fail closed: a guard that cannot read or check the call must not let it run
+        print(f"BLOCKED: pre_tool_use check could not run ({type(e).__name__})", file=sys.stderr)
+        sys.exit(2)
+
+    try:
         # Ensure log directory exists
         log_dir = Path.cwd() / "logs"
         log_dir.mkdir(parents=True, exist_ok=True)
@@ -132,14 +138,10 @@ def main():
         with open(log_path, "w") as f:
             json.dump(log_data, f, indent=2)
 
-        sys.exit(0)
-
-    except json.JSONDecodeError:
-        # Gracefully handle JSON decode errors
-        sys.exit(0)
     except Exception:
-        # Handle any other errors gracefully
-        sys.exit(0)
+        # Logging is best effort; it never blocks a tool call
+        pass
+    sys.exit(0)
 
 
 if __name__ == "__main__":
