@@ -49,6 +49,15 @@ def load_prompt(prompt_path: str, variables: Dict[str, str]) -> str:
     return content
 
 
+def is_inside_directory(file_path: str, directory: str, working_dir: str) -> bool:
+    """True if file_path, resolved from the agent's working directory, lies inside directory.
+
+    Resolving follows `..` and symlinks, so `specs/../main.py`, `specs_evil/x.md` and a
+    symlink out of specs/ are all outside. `directory` must already be resolved.
+    """
+    return Path(working_dir, file_path).resolve().is_relative_to(directory)
+
+
 def get_message_emoji(message_type: str) -> str:
     """Get emoji for message type"""
 
@@ -283,15 +292,8 @@ async def run_planner_agent(
                 Panel(write_info, title="📝 Write Request", border_style="yellow")
             )
 
-            # Normalize paths for comparison
-            normalized_file_path = str(Path(file_path).resolve())
-
             # Check if file is in the plan directory
-            if not (
-                normalized_file_path.startswith(full_plan_directory)
-                or file_path.startswith(PLAN_DIRECTORY)
-                or PLAN_DIRECTORY in file_path
-            ):
+            if not is_inside_directory(file_path, full_plan_directory, working_dir):
                 console.print(
                     Panel(
                         f"Write blocked: Planner can only write to {full_plan_directory}",
@@ -594,15 +596,8 @@ async def run_reviewer_agent(
                 )
             )
 
-            # Normalize the file path for comparison
-            normalized_file_path = str(Path(file_path).resolve())
-
             # Check if file is in the full review directory
-            if not (
-                normalized_file_path.startswith(full_review_directory)
-                or file_path.startswith(REVIEW_DIRECTORY)
-                or REVIEW_DIRECTORY in file_path
-            ):
+            if not is_inside_directory(file_path, full_review_directory, working_dir):
                 console.print(
                     Panel(
                         f"Write blocked: Reviewer can only write to {full_review_directory}\nAttempted path: {file_path}",
