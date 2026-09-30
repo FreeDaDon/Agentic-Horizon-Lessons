@@ -48,6 +48,11 @@ step "pytest: 14.orchestrator-agent-with-adws-singularity/adws (stdlib-only ADW 
 (cd "14.orchestrator-agent-with-adws-singularity/adws" && uv run --no-project --quiet --with pytest \
   pytest -q -p no:cacheprovider adw_tests/test_adw_review.py adw_tests/test_adw_plan.py)
 
+step "bun + tsc: 11. building-specialized-agents/apps/custom_1_pong_agent (TypeScript)"
+(cd "11. building-specialized-agents/apps/custom_1_pong_agent" && npx -y bun@1 install --frozen-lockfile --silent \
+  && npx -y -p typescript@5 tsc --noEmit --strict --module esnext --moduleResolution bundler \
+     --target es2022 --types bun --skipLibCheck pong_agent.ts && echo "pong_agent.ts type-checks")
+
 step "pytest: tests/ (repo-level guard hook tests)"
 uv run --no-project --quiet --with pytest pytest -q -p no:cacheprovider tests
 
