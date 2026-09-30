@@ -166,13 +166,10 @@ Please reconsider your approach and use a safer command."""
         # Command is safe, allow execution
         sys.exit(0)
 
-    except json.JSONDecodeError as e:
-        print(f"Error parsing input: {e}", file=sys.stderr)
-        sys.exit(1)
     except Exception as e:
-        # Don't block on errors, just log
-        print(f"Hook error: {e}", file=sys.stderr)
-        sys.exit(0)
+        # Fail closed: exit 1 would let the command run unchecked
+        print(f"BLOCKED: dangerous command check could not run ({type(e).__name__}: {e})", file=sys.stderr)
+        sys.exit(2)
 
 
 if __name__ == "__main__":
