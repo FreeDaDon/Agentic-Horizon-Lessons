@@ -1,63 +1,72 @@
 #!/usr/bin/env python3
 """
 Test script to verify inline hooks functionality
+
+Runs under pytest or directly: uv run python test_inline_hooks.py
 """
 
 import asyncio
+import re
+from pathlib import Path
+
 from qa_agent import block_env_files, log_tool_usage, HookContext
 
 
-async def test_hooks():
-    """Test the inline hook functions."""
-
-    print("Testing inline hooks...")
-    print("-" * 50)
-
-    # Create a mock context
-    context = HookContext()
-
-    # Test 1: Block .env file
-    print("\n1. Testing .env file blocking:")
-    result = await block_env_files(
-        input_data={
-            'tool_name': 'Read',
-            'tool_input': {'file_path': '/path/to/.env'}
-        },
-        tool_use_id='test-id-1',
-        context=context
+def call(hook, tool_name, tool_input):
+    return asyncio.run(
+        hook(
+            input_data={"tool_name": tool_name, "tool_input": tool_input},
+            tool_use_id="test-id",
+            context=HookContext(),
+        )
     )
-    print(f"   Result: {result}")
-    print(f"   Should block: {'deny' in str(result)}")
 
-    # Test 2: Allow normal file
-    print("\n2. Testing normal file access:")
-    result = await block_env_files(
-        input_data={
-            'tool_name': 'Read',
-            'tool_input': {'file_path': '/path/to/normal.py'}
-        },
-        tool_use_id='test-id-2',
-        context=context
-    )
-    print(f"   Result: {result}")
-    print(f"   Should allow: {result == {}}")
 
-    # Test 3: Test logging
-    print("\n3. Testing tool usage logging:")
-    result = await log_tool_usage(
-        input_data={
-            'tool_name': 'Read',
-            'tool_input': {'file_path': '/path/to/file.txt'}
-        },
-        tool_use_id='test-id-3',
-        context=context
-    )
-    print(f"   Result: {result}")
-    print(f"   Should return empty: {result == {}}")
+def denied(result):
+    return result.get("hookSpecificOutput", {}).get("permissionDecision") == "deny"
 
-    print("\n" + "-" * 50)
-    print("All tests completed!")
+
+BLOCKED = [
+    ("Read", {"file_path": "/path/to/.env"}),
+    ("Read", {"file_path": ".env.sample"}),
+    ("Bash", {"command": "cat .env"}),
+    ("Bash", {"command": "grep KEY ../.env"}),
+    ("Grep", {"pattern": "KEY", "path": ".env"}),
+    ("Grep", {"pattern": "KEY", "path": ".", "glob": "*.env*"}),
+]
+
+ALLOWED = [
+    ("Read", {"file_path": "/path/to/normal.py"}),
+    ("Bash", {"command": "ls -la"}),
+    ("Bash", {"command": "git log --oneline -5"}),
+    ("Grep", {"pattern": "def ", "path": "src"}),
+    ("Glob", {"pattern": "**/*.py"}),
+]
+
+
+def test_env_access_is_blocked_for_every_file_reading_tool():
+    for tool_name, tool_input in BLOCKED:
+        assert denied(call(block_env_files, tool_name, tool_input)), (tool_name, tool_input)
+
+
+def test_normal_access_is_allowed():
+    for tool_name, tool_input in ALLOWED:
+        assert call(block_env_files, tool_name, tool_input) == {}, (tool_name, tool_input)
+
+
+def test_hook_is_registered_for_read_grep_and_bash():
+    source = Path(__file__).with_name("qa_agent.py").read_text()
+    match = re.search(r'HookMatcher\(matcher="([^"]*)", hooks=\[block_env_files\]\)', source)
+    assert match and set(match.group(1).split("|")) == {"Read", "Grep", "Bash"}
+
+
+def test_logging_hook_never_blocks():
+    assert call(log_tool_usage, "Read", {"file_path": "/path/to/file.txt"}) == {}
 
 
 if __name__ == "__main__":
-    asyncio.run(test_hooks())
+    for name, test in list(globals().items()):
+        if name.startswith("test_"):
+            test()
+            print(f"PASS {name}")
+    print("All tests completed!")

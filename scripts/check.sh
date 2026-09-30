@@ -42,6 +42,8 @@ done
 
 pytest_app "11. building-specialized-agents/apps/custom_7_micro_sdlc_agent/backend" tests
 
+pytest_app "11. building-specialized-agents/apps/custom_5_qa_agent" test_inline_hooks.py
+
 step "pytest: tests/ (repo-level guard hook tests)"
 uv run --no-project --quiet --with pytest pytest -q -p no:cacheprovider tests
 

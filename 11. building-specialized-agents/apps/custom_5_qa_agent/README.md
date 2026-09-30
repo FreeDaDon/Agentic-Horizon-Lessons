@@ -106,8 +106,8 @@ The QA Agent implements comprehensive security using inline hooks that monitor A
 #### Hook Functions
 
 1. **`block_env_files`** - Blocks access to .env files
-   - Intercepts all Read tool calls
-   - Denies access to any file containing `.env`
+   - Intercepts all Read, Grep and Bash tool calls
+   - Denies any file path, Grep path/glob or Bash command containing `.env`
    - Works for both main agent and subagents
    - Returns proper denial response to Claude
 
@@ -130,7 +130,7 @@ The QA Agent implements comprehensive security using inline hooks that monitor A
 ```python
 hooks = {
     'PreToolUse': [
-        HookMatcher(matcher='Read', hooks=[block_env_files]),
+        HookMatcher(matcher='Read|Grep|Bash', hooks=[block_env_files]),
         HookMatcher(hooks=[log_tool_usage])  # All tools
     ],
     'PostToolUse': [
@@ -148,6 +148,8 @@ hooks = {
 Run the inline hooks test suite:
 ```bash
 uv run python test_inline_hooks.py
+# or
+uv run --with pytest pytest test_inline_hooks.py
 ```
 
 This tests the hook functions directly and verifies blocking behavior.

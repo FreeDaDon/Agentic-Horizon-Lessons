@@ -58,14 +58,20 @@ async def block_env_files(
     Hook to block .env file access from both main agent and subagents.
 
     This security hook prevents reading of environment files that may contain secrets.
+    Read, Grep and Bash can all read a file, so each one is checked.
     """
 
     tool_name = input_data.get("tool_name", "")
     tool_input = input_data.get("tool_input", {})
-    file_path = tool_input.get("file_path", "")
 
-    # Only check Read operations
-    if tool_name != "Read":
+    # What each file-reading tool would touch
+    if tool_name == "Read":
+        file_path = tool_input.get("file_path", "")
+    elif tool_name == "Grep":
+        file_path = f"{tool_input.get('path', '')} {tool_input.get('glob', '')}"
+    elif tool_name == "Bash":
+        file_path = tool_input.get("command", "")
+    else:
         return {}
 
     # Block .env files
@@ -380,7 +386,7 @@ class QAAgentREPL:
         # Configure inline hooks for security
         hooks = {
             "PreToolUse": [
-                HookMatcher(matcher="Read", hooks=[block_env_files]),
+                HookMatcher(matcher="Read|Grep|Bash", hooks=[block_env_files]),
                 HookMatcher(hooks=[log_tool_usage]),  # Applies to all tools
             ],
             "PostToolUse": [HookMatcher(hooks=[log_tool_usage])],
