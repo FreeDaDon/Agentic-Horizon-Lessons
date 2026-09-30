@@ -53,6 +53,7 @@ from adw_modules.adw_logging import (
     update_adw_status,
 )
 from adw_modules.adw_summarizer import summarize_event
+from adw_modules.adw_plan import existing_plan_path
 from adw_modules.adw_review import parse_verdict
 from adw_modules.adw_websockets import broadcast_adw_event_summary_update
 from adw_modules.adw_agent_sdk import (
@@ -1246,6 +1247,12 @@ async def run_workflow(adw_id: str) -> bool:
             session_id=plan_session_id,
             model=model,
         )
+
+        # The extraction agent runs in a fresh session and can name a file that was never written
+        extracted_path = plan_path
+        plan_path = existing_plan_path(extracted_path, working_dir)
+        if extracted_path and not plan_path:
+            console.print(f"[yellow]Extracted plan path does not exist: {extracted_path}[/yellow]")
 
         if not plan_path:
             # Try a fallback - look for recently created .md files in specs/
