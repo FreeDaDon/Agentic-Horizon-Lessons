@@ -53,6 +53,7 @@ from adw_modules.adw_logging import (
     update_adw_status,
 )
 from adw_modules.adw_summarizer import summarize_event
+from adw_modules.adw_review import parse_verdict
 from adw_modules.adw_websockets import broadcast_adw_event_summary_update
 from adw_modules.adw_agent_sdk import (
     query_to_completion,
@@ -867,14 +868,8 @@ async def run_review_step(
 
         duration_ms = int((time.time() - step_start_time) * 1000)
 
-        # Extract verdict from result
-        verdict = None
-        if result.success and result.result:
-            result_text = result.result.upper()
-            if "PASS" in result_text and "FAIL" not in result_text:
-                verdict = "PASS"
-            elif "FAIL" in result_text:
-                verdict = "FAIL"
+        # Extract verdict from result (None when the review states neither)
+        verdict = parse_verdict(result.result) if result.success else None
 
         # Update agent with session_id and usage
         await update_agent(
@@ -1315,13 +1310,16 @@ async def run_workflow(adw_id: str) -> bool:
             return False
 
         # =====================================================================
-        # Step 4: Fix (only if review found issues)
+        # Step 4: Fix (unless the review clearly passed)
         # =====================================================================
         fix_session_id = None
         fix_agent_id = None
 
-        if verdict == "FAIL":
-            console.print("[yellow]Review found issues - proceeding to fix step[/yellow]")
+        if verdict != "PASS":
+            if verdict == "FAIL":
+                console.print("[yellow]Review found issues - proceeding to fix step[/yellow]")
+            else:
+                console.print("[yellow]Review verdict unclear - treating it as FAIL and proceeding to fix step[/yellow]")
 
             # Find the review file path
             review_path = await extract_review_path(working_dir)
@@ -1394,7 +1392,7 @@ async def run_workflow(adw_id: str) -> bool:
                 "review_verdict": verdict,
                 "fix_session_id": fix_session_id,
                 "fix_agent_id": fix_agent_id,
-                "fix_executed": verdict == "FAIL",
+                "fix_executed": verdict != "PASS",
                 "duration_seconds": duration_seconds,
             },
         )
@@ -1407,7 +1405,7 @@ async def run_workflow(adw_id: str) -> bool:
             f"Duration: {duration_seconds}s\n"
             f"Plan file: {plan_path}\n"
             f"Review verdict: {verdict_emoji} {verdict or 'Unknown'}\n"
-            f"Fix applied: {'Yes' if verdict == 'FAIL' else 'No (not needed)'}",
+            f"Fix applied: {'Yes' if verdict != 'PASS' else 'No (not needed)'}",
             title="ADW Complete",
             width=console.width,
         ))
