@@ -5,7 +5,8 @@
 # Not covered here, because they need services or keys:
 #   - orchestrator_3_stream tests/test_database.py (PostgreSQL via DATABASE_URL)
 #   - nile/server tests (ANTHROPIC_API_KEY)
-#   - test_agent_events.py, test_display.py, test_websocket_raw.py, micro_sdlc test_*.py
+#   - test_agent_events.py, test_display.py, test_websocket_raw.py, and micro_sdlc test_concurrent.py
+#     / test_websocket.py
 #     (scripts that drive a running server; pytest collects nothing from most of them)
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -38,6 +39,8 @@ for lesson in "13. agent-experts" "14.orchestrator-agent-with-adws-singularity";
   pytest_app "$lesson/apps/orchestrator_3_stream/backend" \
     tests/test_slash_command_discovery.py tests/test_autocomplete_agent.py tests/test_autocomplete_endpoints.py
 done
+
+pytest_app "11. building-specialized-agents/apps/custom_7_micro_sdlc_agent/backend" tests
 
 step "pytest: tests/ (repo-level guard hook tests)"
 uv run --no-project --quiet --with pytest pytest -q -p no:cacheprovider tests
