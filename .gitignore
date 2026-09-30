@@ -1,1 +1,18 @@
 *.mp4
+
+# Secrets: real env files never belong in git; the .env.sample templates do
+.env
+.env.*
+!.env.sample
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# Node
+node_modules/
+
+# OS
+.DS_Store
