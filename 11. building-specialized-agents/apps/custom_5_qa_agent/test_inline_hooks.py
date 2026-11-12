@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 import qa_agent
-from qa_agent import HookContext, block_bash_writes, block_env_files, log_tool_usage
+from qa_agent import HookContext, block_env_files, enforce_read_only_bash, log_tool_usage
 
 
 def call(hook, tool_name, tool_input):
@@ -83,12 +83,33 @@ WRITES_BLOCKED = [
 WRITES_ALLOWED = [
     "ls -la",
     "cat README.md",
-    "grep -rn TODO src 2>/dev/null",
+    "grep -n TODO qa_agent.py 2>/dev/null",
     "git log --oneline -5 2>&1",
-    "sed -n 1,20p file.py",
+    "git diff HEAD~1 --stat",
     "find . -name '*.py'",
     "wc -l qa_agent.py > /dev/null",
-    "head -n 3 a.txt | sort | uniq -c",
+    "head -n 3 a.txt | sort | cut -c1-5",
+    "rg TODO .",
+]
+
+# Bypasses a denylist cannot close: variable indirection, ANSI-C quoting, interpreters,
+# command substitution, recursive reads that sweep in .env.
+ENV_ESCAPES_BLOCKED = [
+    "f=.e; cat ${f}nv",
+    "cat $'\\x2eenv'",
+    "cat $(ls -a | grep env)",
+    "cat `ls -a | grep env`",
+    'python -c "print(open(chr(46)+\'env\').read())"',
+    "node -e 'require(\"fs\").readFileSync(\".env\")'",
+    "awk '{print}' .en''v",
+    "sed -n p README.md",
+    "grep -r SECRET .",
+    "grep -Rn KEY .",
+    "rg --hidden SECRET",
+    "rg -uu SECRET",
+    "git config --list",
+    "sort -o out.txt a.txt",
+    "while read l; do echo $l; done < .env",
 ]
 
 
@@ -111,16 +132,30 @@ def test_a_symlink_to_an_env_file_is_blocked():
 
 def test_bash_cannot_change_files():
     for command in WRITES_BLOCKED:
-        assert denied(call(block_bash_writes, "Bash", {"command": command})), command
+        assert denied(call(enforce_read_only_bash, "Bash", {"command": command})), command
 
 
 def test_read_only_bash_is_allowed():
     for command in WRITES_ALLOWED:
-        assert call(block_bash_writes, "Bash", {"command": command}) == {}, command
+        assert call(enforce_read_only_bash, "Bash", {"command": command}) == {}, command
+
+
+def test_bash_cannot_reach_env_files_through_indirection():
+    for command in ENV_ESCAPES_BLOCKED:
+        assert denied(call(enforce_read_only_bash, "Bash", {"command": command})), command
+
+
+def test_bash_argument_symlinked_to_an_env_file_is_blocked(monkeypatch):
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / ".env").write_text("KEY=x")
+        (Path(tmp) / "config.txt").symlink_to(Path(tmp) / ".env")
+        monkeypatch.chdir(tmp)
+        assert denied(call(enforce_read_only_bash, "Bash", {"command": "cat config.txt"}))
+        assert call(enforce_read_only_bash, "Bash", {"command": "ls"}) == {}
 
 
 def test_write_hook_ignores_other_tools():
-    assert call(block_bash_writes, "Read", {"file_path": "notes.txt"}) == {}
+    assert call(enforce_read_only_bash, "Read", {"file_path": "notes.txt"}) == {}
 
 
 def test_the_agent_registers_both_guards_for_bash(monkeypatch):
@@ -140,7 +175,7 @@ def test_the_agent_registers_both_guards_for_bash(monkeypatch):
     pre_tool_use = captured["options"].hooks["PreToolUse"]
     bash_hooks = [h for m in pre_tool_use if m.matcher is None or "Bash" in m.matcher.split("|") for h in m.hooks]
     read_hooks = [h for m in pre_tool_use if m.matcher is None or "Read" in m.matcher.split("|") for h in m.hooks]
-    assert block_env_files in bash_hooks and block_bash_writes in bash_hooks
+    assert block_env_files in bash_hooks and enforce_read_only_bash in bash_hooks
     assert block_env_files in read_hooks
 
 

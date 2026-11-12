@@ -29,14 +29,14 @@ async def login(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
 
     return LoginResponse(
         **UserResponse.model_validate(user).model_dump(),
-        token=issue_token(user.id),
+        token=await issue_token(db, user.id),
     )
 
 
 @router.post("/logout")
-async def logout(token: str = Depends(session_token)):
+async def logout(token: str = Depends(session_token), db: AsyncSession = Depends(get_db)):
     """Revoke the caller's session token."""
-    revoke_token(token)
+    await revoke_token(db, token)
     return {"status": "success"}
 
 

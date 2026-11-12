@@ -1,6 +1,7 @@
 """Configuration settings for Nile server."""
 import os
 import re
+from datetime import timedelta
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -14,6 +15,9 @@ DATA_DIR.mkdir(exist_ok=True)
 
 # Database
 DATABASE_URL = f"sqlite+aiosqlite:///{DATA_DIR}/nile.db"
+
+# Login tokens expire this many hours after they are issued (default 7 days)
+SESSION_LIFETIME = timedelta(hours=float(os.getenv("SESSION_LIFETIME_HOURS", "168")))
 
 # API Keys
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")

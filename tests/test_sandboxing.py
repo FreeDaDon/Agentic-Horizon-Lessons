@@ -50,6 +50,16 @@ def test_create_is_idempotent_and_remove_cleans_up(repo):
     sandbox.remove_worktree(wt)
 
 
+def test_gitignored_secrets_never_reach_the_worktree(repo):
+    (repo / ".gitignore").write_text(".env\n")
+    git(repo, "add", ".gitignore")
+    git(repo, "commit", "-q", "-m", "ignore env")
+    (repo / ".env").write_text("ANTHROPIC_API_KEY=secret\n")
+    wt = sandbox.create_worktree(repo, "builder-2")
+    assert (wt.path / ".gitignore").is_file()
+    assert not (wt.path / ".env").exists(), "an agent confined to its worktree has no .env to read"
+
+
 def test_recreate_reuses_existing_branch_and_its_commits(repo):
     wt = sandbox.create_worktree(repo, "scout")
     (wt.path / "notes.md").write_text("found it\n")

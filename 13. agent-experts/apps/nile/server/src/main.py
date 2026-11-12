@@ -95,8 +95,9 @@ async def websocket_home_stream(websocket: WebSocket, user_id: int):
     from sqlalchemy import select
     from .database import async_session
 
-    if not await authorize_websocket(websocket, user_id):
-        return
+    async with async_session() as db:
+        if not await authorize_websocket(websocket, user_id, db):
+            return
 
     await home_ws_manager.connect(user_id, websocket)
 

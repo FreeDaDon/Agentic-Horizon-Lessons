@@ -100,7 +100,7 @@ Full gap-by-gap tables: [pillar 4](04_multi_agent_orchestration/README.md#gaps-f
 
 Prerequisites: the Claude Code CLI, [`uv`](https://docs.astral.sh/uv/), Node 20+ (or `bun`), and PostgreSQL 14+ for lessons 12–14.
 
-Each lesson folder is self-contained, with its own `README.md`, `.env.sample` and `.claude/`. Copy `.env.sample` to `.env`, add `ANTHROPIC_API_KEY`, and follow that lesson's README. Open Claude Code **inside a lesson folder** so its `.claude/commands`, hooks and skills load; the hooks run through `uv run --script`, so `uv` must be on your `PATH`.
+Each lesson folder is self-contained, with its own `README.md`, `.env.sample` and `.claude/`. Copy `.env.sample` to `.env` and follow that lesson's README. Credentials: the Agent SDK apps and ADWs run on either a Claude Code login (`claude auth status`, a Claude subscription works) or `ANTHROPIC_API_KEY`; only the raw-API hook summarizers need the key, and they skip themselves without it. A full `plan_build_review_fix` ADW was verified live on a subscription login (plan, build, review PASS in 70 seconds). Open Claude Code **inside a lesson folder** so its `.claude/commands`, hooks and skills load; the hooks run through `uv run --script`, so `uv` must be on your `PATH`.
 
 ```bash
 # lessons 12–14: database, then backend and frontend
@@ -109,7 +109,7 @@ cd "14.orchestrator-agent-with-adws-singularity" && cp .env.sample .env    # set
 (cd apps/orchestrator_db && uv run run_migrations.py)                      # stops on the first SQL error
 (cd apps/orchestrator_3_stream && ./start_be.sh) & (cd apps/orchestrator_3_stream && ./start_fe.sh)
 
-# an ADW from the CLI, with a budget
+# an ADW from the CLI, with a budget (it must cover spent + the next step's cap; build defaults to $8)
 uv run adws/adw_triggers/adw_manual_trigger.py demo plan_build_review_fix "<prompt>" "$PWD/apps/<target>" --max-budget-usd 10
 ```
 

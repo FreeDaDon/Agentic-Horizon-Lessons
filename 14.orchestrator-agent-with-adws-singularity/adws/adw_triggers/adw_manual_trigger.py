@@ -91,6 +91,7 @@ async def create_adw_record(
     adw_id = str(uuid.uuid4())
     model = input_data["model"]
     prompt = input_data["prompt"]
+    working_dir = input_data["working_dir"]
 
     conn = await asyncpg.connect(database_url)
     try:
@@ -106,13 +107,14 @@ async def create_adw_record(
                 await conn.execute(
                     """
                     INSERT INTO orchestrator_agents (
-                        id, name, model, status, created_at, updated_at
+                        id, system_prompt, status, working_dir, metadata, created_at, updated_at
                     ) VALUES (
-                        $1, 'manual-test-orchestrator', $2, 'idle', NOW(), NOW()
+                        $1, 'manual-test-orchestrator', 'idle', $2, $3::jsonb, NOW(), NOW()
                     )
                     """,
                     uuid.UUID(orchestrator_agent_id),
-                    model,
+                    working_dir,
+                    json.dumps({"source": "adw_manual_trigger", "model": model}),
                 )
                 console.print(
                     f"[dim]Created orchestrator agent: {orchestrator_agent_id}[/dim]"
