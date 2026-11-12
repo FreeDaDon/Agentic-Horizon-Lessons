@@ -70,9 +70,10 @@ CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173,https://5173-*.e2b.app
 
 ### Auth (server/src/sessions.py)
 Login is still name-only (no password, demo only), but it now returns an opaque session token.
-- HTTP: every user-scoped route requires `Authorization: Bearer <token>` and acts on the token's user. Routes with a `{user_id}` path return 403 for another user's token. A missing or unknown token is a 401.
-- WebSocket: browsers cannot set headers on a WebSocket, so connect to `/ws/home/{user_id}?token=<token>`. The handshake is refused unless the token belongs to `user_id`.
-- Tokens live in server memory. They are lost on every restart (including `--reload`), and they are not shared between processes, so run a single uvicorn worker. After a restart the client gets a 401 and returns to the login page.
+- HTTP: every user-scoped route requires `Authorization: Bearer <token>` and acts on the token's user. Routes with a `{user_id}` path return 403 for another user's token. A missing, unknown, expired or revoked token is a 401.
+- WebSocket: browsers cannot set headers on a WebSocket, so connect to `/ws/home/{user_id}?token=<token>`. The handshake closes with 4401 for a missing, unknown, expired or revoked token and 4403 for another user's token.
+- Sessions are stored in the `user_sessions` table of the Nile database, keyed by the sha256 hex digest of the token. The raw token is never stored. Tokens survive restarts (including `--reload`) and work across uvicorn workers that share the database.
+- A token expires `SESSION_LIFETIME_HOURS` after login (env var, default 168 hours, which is 7 days). Logout marks it revoked. Expired rows are deleted on the next login. After expiry or logout the client gets a 401 and returns to the login page.
 
 ### Database
 SQLite at: `server/data/nile.db`

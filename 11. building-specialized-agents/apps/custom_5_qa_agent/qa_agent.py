@@ -56,13 +56,15 @@ console = Console()
 
 ENV_FILE_REASON = "Security policy: .env files are blocked for credential protection. Do not attempt to access .env files."
 
-# The agent only answers questions, so Bash may read but never change files.
-WRITE_COMMANDS = {
-    "rm", "mv", "cp", "chmod", "chown", "chgrp", "tee", "touch", "mkdir", "rmdir",
-    "ln", "truncate", "dd", "shred", "unlink", "install",
+# The agent only answers questions, so Bash is an allowlist of read-only commands. An allowlist
+# (not a denylist) is what closes indirection: no expansions, no interpreters, no wrappers.
+READ_ONLY_COMMANDS = {
+    "ls", "cat", "head", "tail", "wc", "grep", "rg", "find", "tree", "pwd", "file", "stat", "du",
+    "sort", "cut", "diff", "echo", "basename", "dirname",
 }
-WRAPPERS = {"sudo", "env", "command", "builtin", "exec", "nohup", "time", "nice", "xargs", "timeout", "eval", "!"}
-SHELLS = {"sh", "bash", "zsh", "dash", "ksh"}
+READ_ONLY_GIT = {"log", "show", "diff", "status", "blame", "ls-files", "grep", "rev-parse", "branch", "shortlog"}
+FORBIDDEN_SYNTAX = {"$": "shell expansion", "`": "command substitution", "<(": "process substitution",
+                    ">(": "process substitution", "<<": "heredoc"}
 HARMLESS_REDIRECT_TARGETS = {"/dev/null", "/dev/stdout", "/dev/stderr"}
 PUNCTUATION = set("();<>|&")
 
@@ -117,17 +119,33 @@ def simple_commands(tokens: list[str]) -> list[list[str]]:
     return [c for c in commands + [current] if c]
 
 
-def command_words(words: list[str]) -> list[str]:
-    """The words of the command that actually runs, past assignments and wrappers like sudo."""
-    while words and (re.match(r"^[A-Za-z_]\w*=", words[0]) or words[0] in WRAPPERS or words[0].startswith("-")):
-        words = words[1:]
-    if words and os.path.basename(words[0]) in SHELLS and "-c" in words:
-        return command_words(words[words.index("-c") + 1:])
-    return words
+def flag_reason(name: str, args: list[str]) -> str | None:
+    """Why a read-only command's flags would make it write, run code, or read hidden files."""
+    if name == "find" and any(a in ("-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint", "-fprintf", "-fls")
+                              for a in args):
+        return "find with -delete, -exec or -fprint"
+    if name == "sort" and any(a == "-o" or a.startswith(("-o", "--output")) for a in args):
+        return "sort -o writes a file"
+    if name == "grep" and any(a in ("-r", "-R", "--recursive", "-d", "--directories=recurse")
+                              or re.match(r"^-[a-zA-Z]*[rR]", a) for a in args):
+        return "recursive grep reads every file, .env included: use the Grep tool"
+    if name == "rg" and any(a in ("--hidden", "-.", "--no-ignore") or a.startswith("--no-ignore")
+                            or re.match(r"^-[a-zA-Z]*u", a) for a in args):
+        return "rg with hidden or ignored files"
+    return None
 
 
-def bash_write_reason(command: str) -> str | None:
-    """Why a Bash command could change files, or None for a read-only command."""
+def resolves_to_env_file(word: str) -> bool:
+    """A path argument that is, or links to, an env file."""
+    path = os.path.expanduser(word)
+    return os.path.lexists(path) and is_env_file_name(Path(os.path.realpath(path)).name)
+
+
+def bash_policy_reason(command: str) -> str | None:
+    """Why a Bash command falls outside the read-only allowlist, or None when it is allowed."""
+    for syntax, label in FORBIDDEN_SYNTAX.items():
+        if syntax in command:
+            return f"{label} ({syntax})"
     tokens = shell_tokens(command)
     for i, token in enumerate(tokens):
         if set(token) <= PUNCTUATION and ">" in token:
@@ -136,14 +154,18 @@ def bash_write_reason(command: str) -> str | None:
             if not fd_duplication and target not in HARMLESS_REDIRECT_TARGETS:
                 return f"redirect {token} {target}"
     for words in simple_commands(tokens):
-        words = command_words(words)
-        name = os.path.basename(words[0]) if words else ""
-        if name in WRITE_COMMANDS:
-            return name
-        if name == "sed" and any(w.startswith("--in-place") or re.match(r"^-[a-zA-Z]*i", w) for w in words[1:]):
-            return "sed -i"
-        if name == "find" and any(w in ("-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint") for w in words):
-            return "find with -delete or -exec"
+        name, args = words[0], words[1:]
+        if name == "git":
+            sub = next((a for a in args if not a.startswith("-")), "")
+            if sub not in READ_ONLY_GIT:
+                return f"git {sub or '(no subcommand)'} is not read-only"
+        elif name not in READ_ONLY_COMMANDS:
+            return f"{name} is not on the read-only command allowlist"
+        reason = flag_reason(name, args)
+        if reason:
+            return reason
+        if any(resolves_to_env_file(a) for a in args if not a.startswith("-")):
+            return "argument resolves to an env file"
     return None
 
 
@@ -225,18 +247,18 @@ async def block_env_files(
     return {}
 
 
-async def block_bash_writes(
+async def enforce_read_only_bash(
     input_data: dict[str, Any], tool_use_id: str | None, context: HookContext
 ) -> dict[str, Any]:
-    """Hook that keeps Bash read-only: redirects into files and file-changing commands are denied."""
+    """Hook that keeps Bash to the read-only allowlist: no writes, no expansions, no interpreters."""
 
     if input_data.get("tool_name") != "Bash":
         return {}
     command = input_data.get("tool_input", {}).get("command", "")
-    reason = bash_write_reason(command)
+    reason = bash_policy_reason(command)
     if reason is None:
         return {}
-    return deny(f"The QA agent is read-only; Bash may not change files ({reason}).", command)
+    return deny(f"The QA agent's Bash is read-only and allowlisted ({reason}).", command)
 
 
 async def log_tool_usage(
@@ -503,7 +525,7 @@ class QAAgentREPL:
         hooks = {
             "PreToolUse": [
                 HookMatcher(matcher="Read|Grep|Bash", hooks=[block_env_files]),
-                HookMatcher(matcher="Bash", hooks=[block_bash_writes]),
+                HookMatcher(matcher="Bash", hooks=[enforce_read_only_bash]),
                 HookMatcher(hooks=[log_tool_usage]),  # Applies to all tools
             ],
             "PostToolUse": [HookMatcher(hooks=[log_tool_usage])],

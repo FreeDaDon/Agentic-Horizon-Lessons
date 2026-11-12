@@ -25,11 +25,11 @@ labs/check_lab.py 6 /tmp/adw_plan_build_gated.py
 Reference solution: [`labs/solutions/lab6/adw_plan_build_gated.py`](../labs/solutions/lab6/adw_plan_build_gated.py).
 
 ## Run it for real (optional)
-Copy the file into `14.orchestrator-agent-with-adws-singularity/adws/adw_workflows/`. The orchestrator discovers it by glob, so `start_adw` accepts `plan_build_gated` with no other change. Launch from the CLI with a tight budget:
+Copy the file into `14.orchestrator-agent-with-adws-singularity/adws/adw_workflows/`. The orchestrator discovers it by glob, so `start_adw` accepts `plan_build_gated` with no other change. Launch from the CLI with a tight budget. The run checks `spent + next step's cap` before each step, so the total must cover the largest step cap (build defaults to $8):
 
 ```bash
 cd 14.orchestrator-agent-with-adws-singularity
-uv run adws/adw_triggers/adw_manual_trigger.py demo plan_build_gated "<prompt>" "$PWD/apps/<target>" --max-budget-usd 5
+uv run adws/adw_triggers/adw_manual_trigger.py demo plan_build_gated "<prompt>" "$PWD/apps/<target>" --max-budget-usd 12
 tail -f agents/adw/<adw-id>/run.log
 ```
 
