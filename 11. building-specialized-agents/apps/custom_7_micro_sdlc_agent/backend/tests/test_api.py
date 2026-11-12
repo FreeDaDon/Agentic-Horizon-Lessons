@@ -129,7 +129,7 @@ def test_model_aliases_are_accepted(tickets, model):
     assert tickets[1]["model"] == model
 
 
-@pytest.mark.parametrize("model", ["gpt-4", "claude-opus-4-1", "", "SONNET"])
+@pytest.mark.parametrize("model", ["gpt-4", "claude-opus-latest", "", "SONNET"])
 def test_other_models_are_rejected(tickets, model):
     assert new_ticket(TestClient(main.app), model=model).status_code == 422
     assert tickets == {}

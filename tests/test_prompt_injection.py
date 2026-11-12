@@ -92,15 +92,18 @@ def test_hook_adds_nothing_for_clean_output():
 
 BYPASS = re.compile(r"""["']bypassPermissions["']""")
 # {path: reason}. Every entry must say why that file needs to skip permission prompts.
-BYPASS_ALLOWLIST: dict[str, str] = {}
+BYPASS_ALLOWLIST: dict[str, str] = {
+    "labs/starters/lab3/signal_analyst.py": "deliberately broken starter; lab 3 teaches removing the bypass",
+    "labs/check_lab.py": "the lab 3 check that rejects the bypass",
+}
 
 
 def test_no_tracked_python_file_bypasses_permissions():
-    files = subprocess.run(["git", "ls-files", "-z", "*.py"], cwd=ROOT, capture_output=True, text=True,
-                           check=True).stdout.split("\0")
+    files = subprocess.run(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard", "*.py"],
+                           cwd=ROOT, capture_output=True, text=True, check=True).stdout.split("\0")
     hits = []
     for rel in filter(None, files):
-        if rel.startswith("tests/") or "/tests/" in rel or rel in BYPASS_ALLOWLIST:
+        if rel.startswith("tests/") or "/tests/" in rel or "/adw_tests/" in rel or rel in BYPASS_ALLOWLIST:
             continue
         path = ROOT / rel
         if not path.is_file():

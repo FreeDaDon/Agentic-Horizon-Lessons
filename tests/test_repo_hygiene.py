@@ -41,6 +41,6 @@ def test_no_old_claude_code_sdk_imports():
 def test_no_versioned_model_ids_outside_transcripts_and_locks():
     pattern = r"claude-[0-9a-z-]*(sonnet|opus|haiku)-?[0-9]|\b(sonnet|opus|haiku)[-._][0-9]"
     proc = subprocess.run(
-        ["git", "grep", "-nIE", pattern, "--", ".", ":!*.txt", ":!*.lock", ":!*package-lock.json"],
+        ["git", "grep", "--untracked", "-nIE", pattern, "--", ".", ":!*.txt", ":!*.lock", ":!*package-lock.json"],
         cwd=ROOT, capture_output=True, text=True)
     assert proc.stdout == "", "use model aliases (see cheat_sheets/model_aliases.md):\n" + proc.stdout
