@@ -55,7 +55,7 @@ core_implementation:
       source: "apps/orchestrator_db/models.py"
       synced_to:
         - "apps/orchestrator_3_stream/backend/modules/orch_database_models.py"
-      sync_script: "apps/orchestrator_db/sync_models.py"
+      backend_copy: "apps/orchestrator_3_stream/backend/modules/orch_database_models.py"
 
   schema_migrations:
     directory: "apps/orchestrator_db/migrations/"

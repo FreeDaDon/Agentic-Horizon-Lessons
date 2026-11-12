@@ -28,7 +28,9 @@ from modules.websocket_manager import get_websocket_manager
 from modules import database
 from modules.orchestrator_service import OrchestratorService, get_orchestrator_tools
 from modules.agent_manager import AgentManager
+from modules import adw_bridge
 from modules.orch_database_models import OrchestratorAgent
+from modules.request_guards import origin_allowed, path_inside
 from modules.autocomplete_service import AutocompleteService
 from modules.autocomplete_models import (
     AutocompleteGenerateRequest,
@@ -201,7 +203,8 @@ app.add_middleware(
 class LoadChatRequest(BaseModel):
     """Request model for loading chat history"""
 
-    orchestrator_agent_id: str
+    # Ignored: the server's own orchestrator is used. Kept so older clients still validate.
+    orchestrator_agent_id: Optional[str] = None
     limit: Optional[int] = 50
 
 
@@ -209,7 +212,8 @@ class SendChatRequest(BaseModel):
     """Request model for sending chat message"""
 
     message: str
-    orchestrator_agent_id: str
+    # Ignored: the server's own orchestrator is used. Kept so older clients still validate.
+    orchestrator_agent_id: Optional[str] = None
 
 
 # ═══════════════════════════════════════════════════════════
@@ -263,7 +267,7 @@ async def get_orchestrator_info():
         orchestrator_tools = get_orchestrator_tools()
 
         # Get available ADW workflow types
-        adw_workflows = discover_adw_workflows(config.get_working_dir())
+        adw_workflows = discover_adw_workflows()
 
         # Prepare metadata with fallback for system_message_info
         metadata = orchestrator.metadata or {}
@@ -332,50 +336,17 @@ from modules.slash_command_parser import discover_slash_commands
 # ADW WORKFLOW DISCOVERY
 # ═══════════════════════════════════════════════════════════
 
-def discover_adw_workflows(working_dir: str) -> List[dict]:
-    """
-    Discover available ADW workflow types from adws/adw_workflows/*.py files.
-
-    Args:
-        working_dir: Working directory (project root)
-
-    Returns:
-        List of dicts with workflow type name and description
-    """
-    workflow_dir = Path(working_dir) / "adws" / "adw_workflows"
-    if not workflow_dir.exists():
-        return []
-
-    workflows = []
-    for file in workflow_dir.glob("adw_*.py"):
-        # Extract type from filename: adw_plan_build.py -> plan_build
-        name = file.stem  # adw_plan_build
-        if name.startswith("adw_"):
-            workflow_type = name[4:]  # Remove "adw_" prefix
-
-            # Try to extract description from docstring
-            description = f"ADW workflow: {workflow_type.replace('_', ' ')}"
-            try:
-                content = file.read_text(encoding='utf-8')
-                # Look for module docstring
-                if '"""' in content:
-                    start = content.index('"""') + 3
-                    end = content.index('"""', start)
-                    doc = content[start:end].strip()
-                    # Get first line of docstring
-                    first_line = doc.split('\n')[0].strip()
-                    if first_line and len(first_line) < 200:
-                        description = first_line
-            except Exception:
-                pass
-
-            workflows.append({
-                "type": workflow_type,
-                "display_name": workflow_type.replace("_", "-"),
-                "description": description,
-            })
-
-    return sorted(workflows, key=lambda x: x["type"])
+def discover_adw_workflows() -> List[dict]:
+    """ADW workflow types the runner can start, with their first docstring line and step count."""
+    return [
+        {
+            "type": w.workflow_type,
+            "display_name": w.workflow_type.replace("_", "-"),
+            "description": w.description,
+            "total_steps": w.total_steps,
+        }
+        for w in adw_bridge.discover_workflows().values()
+    ]
 
 
 class OpenFileRequest(BaseModel):
@@ -402,7 +373,15 @@ async def open_file_in_ide(request: OpenFileRequest):
                 "message": "IDE integration is disabled in configuration"
             }
 
-        file_path = request.file_path
+        # Only files inside the orchestrator working directory may be opened
+        resolved = path_inside(request.file_path, config.get_working_dir())
+        if resolved is None:
+            logger.http_request("POST", "/api/open-file", 403)
+            return {
+                "status": "error",
+                "message": "File is outside the orchestrator working directory",
+            }
+        file_path = str(resolved)
 
         # Validate file exists
         if not os.path.exists(file_path):
@@ -469,7 +448,7 @@ async def load_chat(request: LoadChatRequest):
 
         service: OrchestratorService = app.state.orchestrator_service
         result = await service.load_chat_history(
-            orchestrator_agent_id=request.orchestrator_agent_id, limit=request.limit
+            orchestrator_agent_id=str(app.state.orchestrator.id), limit=request.limit
         )
 
         logger.http_request("POST", "/load_chat", 200)
@@ -505,7 +484,7 @@ async def send_chat(request: SendChatRequest):
         asyncio.create_task(
             service.process_user_message(
                 user_message=request.message,
-                orchestrator_agent_id=request.orchestrator_agent_id,
+                orchestrator_agent_id=str(app.state.orchestrator.id),
             )
         )
 
@@ -719,6 +698,13 @@ async def autocomplete_update(request: AutocompleteUpdateRequest):
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time updates and chat messages"""
 
+    # CORS does not cover WebSockets: refuse handshakes from other sites
+    origin = websocket.headers.get("origin")
+    if not origin_allowed(origin, config.CORS_ORIGINS):
+        logger.warning(f"Rejected WebSocket handshake from origin: {origin}")
+        await websocket.close(code=1008)
+        return
+
     await ws_manager.connect(websocket)
 
     try:
@@ -910,6 +896,28 @@ async def get_adw(adw_id: str):
     except Exception as e:
         logger.error(f"Failed to get ADW {adw_id}: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/adws/{adw_id}/cancel")
+async def cancel_adw(adw_id: str):
+    """
+    Stop a running ADW (its whole process group) and mark it cancelled.
+
+    Returns 404 if the ADW does not exist and 409 if it already finished.
+    """
+    logger.http_request("POST", f"/adws/{adw_id}/cancel")
+    try:
+        result = await adw_bridge.cancel_adw(adw_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail=f"Invalid ADW id: {adw_id}")
+
+    if not result.cancelled:
+        status = 404 if result.message.startswith("ADW not found") else 409
+        raise HTTPException(status_code=status, detail=result.message)
+
+    await ws_manager.broadcast_adw_updated(adw_id, {"status": "cancelled"})
+    logger.http_request("POST", f"/adws/{adw_id}/cancel", 200)
+    return {"status": "success", "adw_id": adw_id, "message": result.message}
 
 
 @app.post("/adws/{adw_id}/events")

@@ -661,7 +661,7 @@ lsof -ti:5175 | xargs kill -9
 **Update database schema:**
 1. Modify `apps/orchestrator_db/migrations/*.sql`
 2. Run migrations: `uv run python apps/orchestrator_db/run_migrations.py`
-3. Sync models: `uv run python apps/orchestrator_db/sync_models.py`
+3. Copy models: `cp apps/orchestrator_db/models.py apps/orchestrator_3_stream/backend/modules/orch_database_models.py`
 
 ### Running Tests
 

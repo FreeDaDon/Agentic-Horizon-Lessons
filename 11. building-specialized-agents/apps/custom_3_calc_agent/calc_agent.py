@@ -10,8 +10,10 @@ This demonstrates:
 - Session resumption approach for maintaining conversation history
 """
 
+import ast
 import asyncio
 import math
+import operator
 from pathlib import Path
 from typing import Any
 from rich.console import Console
@@ -47,6 +49,80 @@ def load_system_prompt() -> str:
     return system_prompt
 
 
+MATH_NAMES: dict[str, Any] = {
+    name: value for name, value in math.__dict__.items() if not name.startswith("_")
+} | {"abs": abs, "round": round, "min": min, "max": max, "sum": sum}
+
+BINARY_OPERATORS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.FloorDiv: operator.floordiv,
+    ast.Mod: operator.mod,
+    ast.Pow: operator.pow,
+}
+UNARY_OPERATORS = {ast.UAdd: operator.pos, ast.USub: operator.neg}
+
+# Integer arithmetic is exact and unbounded, so 9**9**9 or factorial(10**8) would pin a CPU.
+MAX_INTEGER_BITS = 100_000
+MAX_COMBINATORIC_ARGUMENT = 10_000
+COMBINATORIC_FUNCTIONS = {math.factorial, math.comb, math.perm}
+
+
+def evaluate_math(expression: str) -> int | float:
+    """Evaluate arithmetic over numbers, + - * / // % **, parentheses and math functions.
+
+    Anything else (attribute access, strings, subscripts, keyword arguments, other names)
+    raises ValueError, so the model cannot reach Python objects through the expression.
+    """
+    return _evaluate(ast.parse(expression, mode="eval").body)
+
+
+def _evaluate(node: ast.AST) -> Any:
+    if isinstance(node, ast.Constant):
+        if type(node.value) not in (int, float):
+            raise ValueError(f"unsupported literal: {node.value!r}")
+        return node.value
+    if isinstance(node, ast.Name):
+        if node.id not in MATH_NAMES:
+            raise ValueError(f"unknown name: {node.id}")
+        return MATH_NAMES[node.id]
+    if isinstance(node, (ast.Tuple, ast.List)):
+        return [_evaluate(element) for element in node.elts]
+    if isinstance(node, ast.UnaryOp) and type(node.op) in UNARY_OPERATORS:
+        return UNARY_OPERATORS[type(node.op)](_number(_evaluate(node.operand)))
+    if isinstance(node, ast.BinOp) and type(node.op) in BINARY_OPERATORS:
+        left, right = _number(_evaluate(node.left)), _number(_evaluate(node.right))
+        if isinstance(node.op, ast.Pow) and isinstance(left, int) and isinstance(right, int):
+            if abs(left) > 1 and right > 0 and left.bit_length() * right > MAX_INTEGER_BITS:
+                raise ValueError("exponent too large")
+        return _bounded(BINARY_OPERATORS[type(node.op)](left, right))
+    if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and not node.keywords:
+        function = _evaluate(node.func)
+        if not callable(function):
+            raise ValueError(f"{node.func.id} is not a function")
+        arguments = [_evaluate(argument) for argument in node.args]
+        if function in COMBINATORIC_FUNCTIONS and any(
+            isinstance(a, (int, float)) and abs(a) > MAX_COMBINATORIC_ARGUMENT for a in arguments
+        ):
+            raise ValueError(f"argument to {node.func.id} too large")
+        return _bounded(function(*arguments))
+    raise ValueError(f"unsupported expression: {type(node).__name__}")
+
+
+def _number(value: Any) -> int | float:
+    if type(value) not in (int, float):
+        raise ValueError(f"expected a number, got {type(value).__name__}")
+    return value
+
+
+def _bounded(value: Any) -> Any:
+    if isinstance(value, int) and value.bit_length() > MAX_INTEGER_BITS:
+        raise ValueError("result too large")
+    return value
+
+
 @tool(
     "custom_math_evaluator",
     "Perform mathematical calculations",
@@ -54,26 +130,11 @@ def load_system_prompt() -> str:
 )
 async def calculate_expression(args: dict[str, Any]) -> dict[str, Any]:
     """
-    Safely evaluate mathematical expressions with limited scope for security.
+    Evaluate a mathematical expression with evaluate_math.
     Supports basic math operations and common mathematical functions.
     """
     try:
-        # Create a safe namespace with math functions
-        allowed_math_functions = {
-            function_name: function_value
-            for function_name, function_value in math.__dict__.items()
-            if not function_name.startswith("_")
-        }
-
-        # Add additional safe functions
-        allowed_math_functions.update(
-            {"abs": abs, "round": round, "min": min, "max": max, "sum": sum}
-        )
-
-        # Evaluate the expression safely
-        calculation_result = eval(
-            args["expression"], {"__builtins__": {}}, allowed_math_functions
-        )
+        calculation_result = evaluate_math(args["expression"])
 
         # Apply precision formatting
         precision_value = args.get("precision", 2)

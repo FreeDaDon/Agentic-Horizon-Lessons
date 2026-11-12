@@ -12,8 +12,11 @@ Features:
 
 import asyncio
 import os
+import re
+import shlex
 import sys
 import json
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Optional, Dict, Any
 from datetime import datetime
@@ -51,47 +54,146 @@ from claude_agent_sdk import (
 console = Console()
 
 
+ENV_FILE_REASON = "Security policy: .env files are blocked for credential protection. Do not attempt to access .env files."
+
+# The agent only answers questions, so Bash may read but never change files.
+WRITE_COMMANDS = {
+    "rm", "mv", "cp", "chmod", "chown", "chgrp", "tee", "touch", "mkdir", "rmdir",
+    "ln", "truncate", "dd", "shred", "unlink", "install",
+}
+WRAPPERS = {"sudo", "env", "command", "builtin", "exec", "nohup", "time", "nice", "xargs", "timeout", "eval", "!"}
+SHELLS = {"sh", "bash", "zsh", "dash", "ksh"}
+HARMLESS_REDIRECT_TARGETS = {"/dev/null", "/dev/stdout", "/dev/stderr"}
+PUNCTUATION = set("();<>|&")
+
+
+def is_env_file_name(base: str) -> bool:
+    return base == ".env" or (base.startswith(".env.") and base != ".env.sample")
+
+
+def brace_expansions(word: str) -> list[str]:
+    match = re.search(r"\{([^{}]*,[^{}]*)\}", word)
+    if not match:
+        return [word]
+    head, tail = word[: match.start()], word[match.end():]
+    return [x for part in match.group(1).split(",") for x in brace_expansions(head + part + tail)]
+
+
+def could_name_env_file(word: str, shell_glob: bool = False) -> bool:
+    """True for .env, .env.local, and globs or brace forms like .e*, .en?, .{e,x}nv that reach them.
+
+    A shell glob only matches a dotfile when the pattern itself starts with a dot, so `cat *`
+    is fine; Grep's globs can match dotfiles from a leading `*`.
+    """
+    for candidate in brace_expansions(word):
+        base = re.split(r"[/=:]", candidate.rstrip("/"))[-1]
+        if is_env_file_name(base):
+            return True
+        if shell_glob and not base.startswith("."):
+            continue
+        if any(c in base for c in "*?[") and any(fnmatchcase(f, base) for f in (".env", ".env.local")):
+            return True
+    return False
+
+
+def shell_tokens(command: str) -> list[str]:
+    """Words and operators of a command with quotes and backslashes dropped, so .en""v reads as .env."""
+    normalized = command.replace("\\\n", " ").replace("`", " ; ")
+    normalized = re.sub(r"[\"'\\]", "", normalized).replace("\n", " ; ")
+    lexer = shlex.shlex(normalized, posix=True, punctuation_chars=True)
+    lexer.whitespace_split = True
+    lexer.commenters = ""
+    return list(lexer)
+
+
+def simple_commands(tokens: list[str]) -> list[list[str]]:
+    commands, current = [], []
+    for token in tokens:
+        if set(token) <= PUNCTUATION and ">" not in token and token not in ("<", "<<", "<<<"):
+            commands.append(current)
+            current = []
+        else:
+            current.append(token)
+    return [c for c in commands + [current] if c]
+
+
+def command_words(words: list[str]) -> list[str]:
+    """The words of the command that actually runs, past assignments and wrappers like sudo."""
+    while words and (re.match(r"^[A-Za-z_]\w*=", words[0]) or words[0] in WRAPPERS or words[0].startswith("-")):
+        words = words[1:]
+    if words and os.path.basename(words[0]) in SHELLS and "-c" in words:
+        return command_words(words[words.index("-c") + 1:])
+    return words
+
+
+def bash_write_reason(command: str) -> str | None:
+    """Why a Bash command could change files, or None for a read-only command."""
+    tokens = shell_tokens(command)
+    for i, token in enumerate(tokens):
+        if set(token) <= PUNCTUATION and ">" in token:
+            target = tokens[i + 1] if i + 1 < len(tokens) else ""
+            fd_duplication = token.endswith("&") and re.match(r"^(\d+|-)$", target)
+            if not fd_duplication and target not in HARMLESS_REDIRECT_TARGETS:
+                return f"redirect {token} {target}"
+    for words in simple_commands(tokens):
+        words = command_words(words)
+        name = os.path.basename(words[0]) if words else ""
+        if name in WRITE_COMMANDS:
+            return name
+        if name == "sed" and any(w.startswith("--in-place") or re.match(r"^-[a-zA-Z]*i", w) for w in words[1:]):
+            return "sed -i"
+        if name == "find" and any(w in ("-delete", "-exec", "-execdir", "-ok", "-okdir", "-fprint") for w in words):
+            return "find with -delete or -exec"
+    return None
+
+
+def deny(reason: str, shown: str) -> dict[str, Any]:
+    console.print(
+        Panel(
+            f"Blocked: {shown}\n\n[yellow]{reason}[/yellow]",
+            title="🔒 SECURITY HOOK",
+            border_style="red",
+            expand=False,
+        )
+    )
+    return {
+        "hookSpecificOutput": {
+            "hookEventName": "PreToolUse",
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+    }
+
+
 async def block_env_files(
     input_data: dict[str, Any], tool_use_id: str | None, context: HookContext
 ) -> dict[str, Any]:
     """
     Hook to block .env file access from both main agent and subagents.
 
-    This security hook prevents reading of environment files that may contain secrets.
-    Read, Grep and Bash can all read a file, so each one is checked.
+    Read, Grep and Bash can all read a file, so each one is checked. Paths are resolved, so
+    a symlink to .env is caught; .env.sample stays readable.
     """
 
     tool_name = input_data.get("tool_name", "")
     tool_input = input_data.get("tool_input", {})
 
-    # What each file-reading tool would touch
     if tool_name == "Read":
         file_path = tool_input.get("file_path", "")
+        names_env = could_name_env_file(file_path) or is_env_file_name(
+            Path(os.path.realpath(os.path.expanduser(file_path))).name
+        )
     elif tool_name == "Grep":
         file_path = f"{tool_input.get('path', '')} {tool_input.get('glob', '')}"
+        names_env = any(could_name_env_file(tool_input.get(k) or "") for k in ("path", "glob"))
     elif tool_name == "Bash":
         file_path = tool_input.get("command", "")
+        names_env = any(could_name_env_file(t, shell_glob=True) for t in shell_tokens(file_path))
     else:
         return {}
 
-    # Block .env files
-    if ".env" in file_path:
-        console.print(
-            Panel(
-                f"Blocked access to: {file_path}\n\n"
-                "[yellow]Environment files contain sensitive credentials and are prohibited.[/yellow]",
-                title="🔒 SECURITY HOOK",
-                border_style="red",
-                expand=False,
-            )
-        )
-        return {
-            "hookSpecificOutput": {
-                "hookEventName": "PreToolUse",
-                "permissionDecision": "deny",
-                "permissionDecisionReason": "Security policy: .env files are blocked for credential protection. Do not attempt to access .env files.",
-            }
-        }
+    if names_env:
+        return deny(ENV_FILE_REASON, file_path)
 
     # Warn about other sensitive files
     sensitive_patterns = [
@@ -121,6 +223,20 @@ async def block_env_files(
             break
 
     return {}
+
+
+async def block_bash_writes(
+    input_data: dict[str, Any], tool_use_id: str | None, context: HookContext
+) -> dict[str, Any]:
+    """Hook that keeps Bash read-only: redirects into files and file-changing commands are denied."""
+
+    if input_data.get("tool_name") != "Bash":
+        return {}
+    command = input_data.get("tool_input", {}).get("command", "")
+    reason = bash_write_reason(command)
+    if reason is None:
+        return {}
+    return deny(f"The QA agent is read-only; Bash may not change files ({reason}).", command)
 
 
 async def log_tool_usage(
@@ -387,6 +503,7 @@ class QAAgentREPL:
         hooks = {
             "PreToolUse": [
                 HookMatcher(matcher="Read|Grep|Bash", hooks=[block_env_files]),
+                HookMatcher(matcher="Bash", hooks=[block_bash_writes]),
                 HookMatcher(hooks=[log_tool_usage]),  # Applies to all tools
             ],
             "PostToolUse": [HookMatcher(hooks=[log_tool_usage])],

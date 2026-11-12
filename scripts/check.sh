@@ -4,7 +4,7 @@
 #
 # Not covered here, because they need services or keys:
 #   - orchestrator_3_stream tests/test_database.py (PostgreSQL via DATABASE_URL)
-#   - nile/server tests (ANTHROPIC_API_KEY)
+#   - nile/server tests/test_agent_expert.py (ANTHROPIC_API_KEY)
 #   - test_agent_events.py, test_display.py, test_websocket_raw.py, and micro_sdlc test_concurrent.py
 #     / test_websocket.py
 #     (scripts that drive a running server; pytest collects nothing from most of them)
@@ -37,16 +37,34 @@ pytest_app() {
 
 for lesson in "13. agent-experts" "14.orchestrator-agent-with-adws-singularity"; do
   pytest_app "$lesson/apps/orchestrator_3_stream/backend" \
-    tests/test_slash_command_discovery.py tests/test_autocomplete_agent.py tests/test_autocomplete_endpoints.py
+    tests/test_slash_command_discovery.py tests/test_autocomplete_agent.py tests/test_autocomplete_endpoints.py \
+    tests/test_autocomplete_tool_lockdown.py tests/test_agent_tool_policy.py tests/test_websocket_broadcast.py \
+    tests/test_request_guards.py tests/test_runtime_config.py tests/test_start_scripts.py
+  pytest_app "$lesson/apps/nile/server" tests/test_auth.py
+done
+
+pytest_app "12. multi-agent-orchestration/apps/orchestrator_3_stream/backend" \
+  tests/test_slash_command_discovery.py tests/test_agent_tool_policy.py tests/test_websocket_broadcast.py \
+  tests/test_request_guards.py tests/test_runtime_config.py tests/test_start_scripts.py
+
+for lesson in "12. multi-agent-orchestration" "13. agent-experts" "14.orchestrator-agent-with-adws-singularity"; do
+  step "pytest: $lesson/apps/orchestrator_db (psql command lines)"
+  (cd "$lesson/apps/orchestrator_db" && uv run --no-project --quiet --with pytest --with python-dotenv --with rich --with click \
+    pytest -q -p no:cacheprovider tests)
 done
 
 pytest_app "11. building-specialized-agents/apps/custom_7_micro_sdlc_agent/backend" tests
 
 pytest_app "11. building-specialized-agents/apps/custom_5_qa_agent" test_inline_hooks.py
+pytest_app "11. building-specialized-agents/apps/custom_8_ultra_stream_agent" tests
+pytest_app "11. building-specialized-agents/apps/custom_3_calc_agent" test_calc_agent.py
+pytest_app "11. building-specialized-agents/apps/custom_4_social_hype_agent" test_notify.py
 
-step "pytest: 14.orchestrator-agent-with-adws-singularity/adws (stdlib-only ADW modules)"
-(cd "14.orchestrator-agent-with-adws-singularity/adws" && uv run --no-project --quiet --with pytest \
-  pytest -q -p no:cacheprovider adw_tests/test_adw_review.py adw_tests/test_adw_plan.py)
+step "pytest: 14.orchestrator-agent-with-adws-singularity/adws (offline: recorded SDK streams, no DB)"
+(cd "14.orchestrator-agent-with-adws-singularity/adws" && uv run --no-project --quiet --with pytest --with pytest-asyncio \
+  --with pydantic==2.12.3 --with claude-agent-sdk==0.2.163 --with asyncpg==0.30.0 --with python-dotenv==1.2.1 \
+  --with rich==14.2.0 --with websockets==15.0.1 \
+  pytest -q -p no:cacheprovider adw_tests)
 
 step "bun + tsc: 11. building-specialized-agents/apps/custom_1_pong_agent (TypeScript)"
 (cd "11. building-specialized-agents/apps/custom_1_pong_agent" && npx -y bun@1 install --frozen-lockfile --silent \
@@ -57,8 +75,25 @@ step "bun + tsc: 9. elite-context-engineering/apps/cc_ts_wrapper (TypeScript)"
 (cd "9. elite-context-engineering/apps/cc_ts_wrapper" && npx -y bun@1 install --frozen-lockfile --silent \
   && npx -y bun@1 run typecheck && echo "cc_ts_wrapper type-checks" && npx -y bun@1 test)
 
-step "pytest: tests/ (repo-level guard hook tests)"
-uv run --no-project --quiet --with pytest pytest -q -p no:cacheprovider tests
+step "bun + tsc: 9. elite-context-engineering hello_cc scripts (TypeScript)"
+(cd "9. elite-context-engineering" && npx -y bun@1 install --frozen-lockfile --silent \
+  && npx -y bun@1 run typecheck && echo "hello_cc scripts type-check")
+
+for lesson in "13. agent-experts" "14.orchestrator-agent-with-adws-singularity"; do
+  step "npm ci + vue-tsc + vite build: $lesson/apps/nile/client"
+  (cd "$lesson/apps/nile/client" && npm ci --silent --no-audit --no-fund && npm run build --silent >/dev/null \
+    && echo "nile client builds")
+done
+
+step "pytest: tests/ (hook wiring, guard hooks, labs, modules 07-11, repo hygiene)"
+uv run --no-project --quiet --with pytest --with pytest-asyncio --with pyyaml \
+  pytest -q -p no:cacheprovider tests
+
+step "Orchestrator delta docs match the code"
+uv run --quiet --script scripts/orchestrator_deltas.py --check
+
+step "Expertise files match the code (08_expertise_drift)"
+uv run --quiet --script 08_expertise_drift/check_expertise.py
 
 step "Tests left the working tree unchanged"
 tree_after=$(git status --porcelain)

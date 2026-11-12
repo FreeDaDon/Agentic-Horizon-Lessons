@@ -14,7 +14,7 @@ One orchestrator agent, *"the conductor of this multi-agent orchestra"*, manages
 | Hooks → DB/WS | `backend/modules/command_agent_hooks.py`, `orchestrator_hooks.py`, `websocket_manager.py` |
 | Summaries | `backend/modules/single_agent_prompt.py` (haiku) |
 | File diffs | `backend/modules/file_tracker.py` |
-| Schema | `apps/orchestrator_db/migrations/0–8`, `models.py`, `sync_models.py` |
+| Schema | `apps/orchestrator_db/migrations/0–8`, `models.py` (copied into the backend as `orch_database_models.py`) |
 | Templates | `apps/orchestrator_3_stream/.claude/agents/*.md` |
 | Patterns | `/orch_one_shot_agent`, `/orch_scout_and_build`, `/orch_plan_w_scouts_build_review`, `/plan_w_scouters`, `/build_in_parallel` |
 

@@ -15,9 +15,11 @@
 #   ./start_be.sh --cwd /path/to/project --session sess_123
 #   ./start_be.sh --cwd /path/to/project
 
-# Load environment variables
+# Load environment variables (sourced, so quoted values and spaces survive)
 if [ -f "$(dirname "$0")/.env" ]; then
-    export $(cat "$(dirname "$0")/.env" | grep -v '^#' | xargs)
+    set -a
+    . "$(dirname "$0")/.env"
+    set +a
 fi
 
 # Use port from .env or default to 9403

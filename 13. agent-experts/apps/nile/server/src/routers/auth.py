@@ -5,14 +5,15 @@ from sqlalchemy import select
 
 from ..database import get_db
 from ..models import User
-from ..schemas import UserCreate, UserResponse
+from ..schemas import UserCreate, UserResponse, LoginResponse
+from ..sessions import issue_token, path_user_id, revoke_token, session_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-@router.post("/login", response_model=UserResponse)
+@router.post("/login", response_model=LoginResponse)
 async def login(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
-    """Login or create user by name (no password for demo)."""
+    """Login or create user by name (no password for demo) and issue a session token."""
     # Find existing user
     result = await db.execute(
         select(User).where(User.name == user_data.name)
@@ -26,12 +27,22 @@ async def login(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
         await db.commit()
         await db.refresh(user)
 
-    return user
+    return LoginResponse(
+        **UserResponse.model_validate(user).model_dump(),
+        token=issue_token(user.id),
+    )
+
+
+@router.post("/logout")
+async def logout(token: str = Depends(session_token)):
+    """Revoke the caller's session token."""
+    revoke_token(token)
+    return {"status": "success"}
 
 
 @router.get("/user/{user_id}", response_model=UserResponse)
-async def get_user(user_id: int, db: AsyncSession = Depends(get_db)):
-    """Get user by ID."""
+async def get_user(user_id: int = Depends(path_user_id), db: AsyncSession = Depends(get_db)):
+    """Get user by ID (only the caller's own user)."""
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
 

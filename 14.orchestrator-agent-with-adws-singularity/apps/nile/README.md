@@ -63,9 +63,16 @@ proxy: {
 ```
 
 ### CORS (server/src/config.py)
-```python
-CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173"]
+Allowed browser origins come from the `CORS_ORIGINS` env var (comma-separated). A `*` matches one hostname label, as in the default E2B entry:
+```bash
+CORS_ORIGINS="http://localhost:5173,http://127.0.0.1:5173,https://5173-*.e2b.app"
 ```
+
+### Auth (server/src/sessions.py)
+Login is still name-only (no password, demo only), but it now returns an opaque session token.
+- HTTP: every user-scoped route requires `Authorization: Bearer <token>` and acts on the token's user. Routes with a `{user_id}` path return 403 for another user's token. A missing or unknown token is a 401.
+- WebSocket: browsers cannot set headers on a WebSocket, so connect to `/ws/home/{user_id}?token=<token>`. The handshake is refused unless the token belongs to `user_id`.
+- Tokens live in server memory. They are lost on every restart (including `--reload`), and they are not shared between processes, so run a single uvicorn worker. After a restart the client gets a 401 and returns to the login page.
 
 ### Database
 SQLite at: `server/data/nile.db`
@@ -155,6 +162,13 @@ The frontend renders different components based on agent recommendations:
 Components: `client/src/components/products/`
 
 ## API Endpoints
+
+Everything except login and the product routes needs `Authorization: Bearer <token>`.
+
+### Auth
+- `POST /api/auth/login` - Log in or create a user by name; returns the user and a session token
+- `POST /api/auth/logout` - Revoke the caller's token
+- `GET /api/auth/user/{id}` - Get the caller's own user
 
 ### Products
 - `GET /api/products` - List products (limit, offset)

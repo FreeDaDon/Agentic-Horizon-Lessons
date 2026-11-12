@@ -1,8 +1,8 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "websockets>=12.0",
-#   "python-dotenv>=1.0.0",
+#   "websockets==15.0.1",
+#   "python-dotenv==1.2.1",
 # ]
 # ///
 """
@@ -32,8 +32,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
-import websockets
-from websockets.client import WebSocketClientProtocol
+from websockets.asyncio.client import ClientConnection, connect
+from websockets.exceptions import ConnectionClosed
 from dotenv import load_dotenv
 
 # Load environment variables
@@ -91,7 +91,7 @@ class AdwWebSocketClient:
         """
         self.url = url
         self.verbose = verbose
-        self._ws: Optional[WebSocketClientProtocol] = None
+        self._ws: Optional[ClientConnection] = None
         self._connected = False
         self._reconnect_attempts = 0
         self._client_id: Optional[str] = None
@@ -125,7 +125,7 @@ class AdwWebSocketClient:
 
         try:
             self._ws = await asyncio.wait_for(
-                websockets.connect(self.url),
+                connect(self.url),
                 timeout=CONNECTION_TIMEOUT
             )
             self._connected = True
@@ -221,7 +221,7 @@ class AdwWebSocketClient:
             await self._ws.send(json.dumps(data))
             return True
 
-        except websockets.exceptions.ConnectionClosed:
+        except ConnectionClosed:
             self._log("[ADW-WS] Connection closed during send")
             self._connected = False
             # Try one reconnect

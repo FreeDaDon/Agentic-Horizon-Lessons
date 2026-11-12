@@ -1,0 +1,23 @@
+{
+  "type": "result",
+  "subtype": "success",
+  "is_error": false,
+  "api_error_status": null,
+  "duration_ms": 2232,
+  "duration_api_ms": 1947,
+  "num_turns": 1,
+  "result": "ok",
+  "stop_reason": "end_turn",
+  "terminal_reason": "completed",
+  "session_id": "371aff2a-f5fa-47b1-8df5-1d75288a4762",
+  "total_cost_usd": 0.0043392,
+  "usage": {
+    "input_tokens": 2,
+    "cache_creation_input_tokens": 21063,
+    "cache_read_input_tokens": 0,
+    "output_tokens": 4,
+    "service_tier": "standard"
+  },
+  "permission_denials": [],
+  "uuid": "7a333e3f-89f5-4c49-a944-aa2b2741ba8b"
+}

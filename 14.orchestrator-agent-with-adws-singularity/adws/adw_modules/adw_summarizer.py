@@ -1,7 +1,7 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "claude-agent-sdk>=0.1.18",
+#   "claude-agent-sdk==0.2.163",
 # ]
 # ///
 """
@@ -47,6 +47,25 @@ Provide ONLY the summary sentence, no other text."""
 # =============================================================================
 
 
+def summary_options(model: str = FAST_MODEL, system_prompt: Optional[str] = None) -> ClaudeAgentOptions:
+    """Options for a summary: one turn, no tools at all, default permissions.
+
+    The prompt embeds agent output (tool inputs, file text), so the summarizer
+    must not be able to act on anything it reads.
+    """
+    env_vars = {}
+    if "ANTHROPIC_API_KEY" in os.environ:
+        env_vars["ANTHROPIC_API_KEY"] = os.environ["ANTHROPIC_API_KEY"]
+    return ClaudeAgentOptions(
+        model=model,
+        system_prompt=system_prompt,
+        tools=[],
+        allowed_tools=[],
+        max_turns=1,
+        env=env_vars,
+    )
+
+
 async def fast_claude_query(
     prompt: str, model: str = FAST_MODEL, system_prompt: Optional[str] = None
 ) -> str:
@@ -61,33 +80,19 @@ async def fast_claude_query(
         system_prompt: Optional system prompt
 
     Returns:
-        Text response from Claude
+        Text response from Claude, or "" if the query failed
     """
     try:
-        # Pass ANTHROPIC_API_KEY explicitly
-        env_vars = {}
-        if "ANTHROPIC_API_KEY" in os.environ:
-            env_vars["ANTHROPIC_API_KEY"] = os.environ["ANTHROPIC_API_KEY"]
-
-        options = ClaudeAgentOptions(
-            model=model,
-            system_prompt=system_prompt,
-            permission_mode="bypassPermissions",
-            env=env_vars,
-        )
-
         response_text = ""
-
-        async for message in query(prompt=prompt, options=options):
+        async for message in query(prompt=prompt, options=summary_options(model, system_prompt)):
             if isinstance(message, AssistantMessage):
                 for block in message.content:
                     if isinstance(block, TextBlock):
                         response_text += block.text
-
         return response_text.strip()
 
     except Exception as e:
-        # Log but don't fail - return empty string for graceful degradation
+        # Summaries are decoration; the caller falls back to a static summary
         print(f"[ADW Summarizer] Fast query failed: {e}")
         return ""
 
@@ -185,5 +190,6 @@ async def summarize_event(event_data: dict[str, Any], event_type: str) -> str:
 
 __all__ = [
     "fast_claude_query",
+    "summary_options",
     "summarize_event",
 ]

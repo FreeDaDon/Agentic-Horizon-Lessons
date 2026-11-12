@@ -18,6 +18,11 @@ class UserResponse(BaseModel):
         from_attributes = True
 
 
+class LoginResponse(UserResponse):
+    """Schema for login response: the user plus their session token."""
+    token: str
+
+
 class UserInDB(UserResponse):
     """Schema for user in database."""
     updated_at: datetime

@@ -47,10 +47,10 @@ const emit = defineEmits<{
               </span>
             </div>
           </div>
-          <div class="reviews-preview" v-if="product.reviews?.length">
+          <div class="reviews-preview" v-if="product.reviews?.[0]">
             <h4>Top Review</h4>
-            <p class="review-text">"{{ product.reviews[0].review_text }}"</p>
-            <span class="reviewer">— {{ product.reviews[0].reviewer_name }}</span>
+            <p class="review-text">"{{ product.reviews[0]?.review_text }}"</p>
+            <span class="reviewer">— {{ product.reviews[0]?.reviewer_name }}</span>
           </div>
           <div class="action-row">
             <div class="price-container">

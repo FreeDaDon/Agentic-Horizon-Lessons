@@ -15,5 +15,6 @@ dependencies = [
     "python-dotenv",
 ]
 
-[tool.uv]
-dev-dependencies = []
+[dependency-groups]
+# httpx: fastapi.testclient needs it (tests/test_request_guards.py)
+dev = ["pytest", "pytest-asyncio", "httpx"]

@@ -1,5 +1,5 @@
 """Pydantic schemas for Nile API."""
-from .user import UserCreate, UserResponse, UserInDB
+from .user import UserCreate, UserResponse, UserInDB, LoginResponse
 from .product import ProductCreate, ProductResponse, ReviewResponse, ProductSearchParams
 from .cart import CartItemCreate, CartItemUpdate, CartItemResponse, CartResponse
 from .order import OrderCreate, OrderItemResponse, OrderResponse
@@ -14,7 +14,7 @@ from .home_page import (
 )
 
 __all__ = [
-    "UserCreate", "UserResponse", "UserInDB",
+    "UserCreate", "UserResponse", "UserInDB", "LoginResponse",
     "ProductCreate", "ProductResponse", "ReviewResponse", "ProductSearchParams",
     "CartItemCreate", "CartItemUpdate", "CartItemResponse", "CartResponse",
     "OrderCreate", "OrderItemResponse", "OrderResponse",

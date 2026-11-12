@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { query } from "@anthropic-ai/claude-code";
+import { query } from "@anthropic-ai/claude-agent-sdk";
 
 async function main() {
   console.log("🤖 Claude Code TypeScript SDK Hello World!");
@@ -18,14 +18,14 @@ async function main() {
     })) {
       if (message.type === "result") {
         console.log("✅ Result received:");
-        console.log(message.result || "No result content");
+        console.log(message.subtype === "success" ? message.result : `No result (${message.subtype})`);
         console.log(`\n📊 Cost: $${message.total_cost_usd}`);
         console.log(`⏱️  Duration: ${message.duration_ms}ms`);
         console.log(`🔄 Turns: ${message.num_turns}`);
         console.log(`🎯 Success: ${message.subtype === "success"}`);
       } else if (message.type === "assistant") {
         console.log("🧠 Assistant thinking...");
-      } else if (message.type === "system") {
+      } else if (message.type === "system" && message.subtype === "init") {
         console.log("🚀 System initialized");
         console.log(`Session ID: ${message.session_id}`);
         console.log(`Model: ${message.model}`);

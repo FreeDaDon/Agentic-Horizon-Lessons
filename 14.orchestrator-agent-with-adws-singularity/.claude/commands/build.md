@@ -16,7 +16,7 @@ Follow the `Workflow` to implement the `PATH_TO_PLAN` then `Report` the complete
 
 ## Variables
 
-PATH_TO_PLAN: $ARGUMENTS
+PATH_TO_PLAN: $1
 
 ## Workflow
 

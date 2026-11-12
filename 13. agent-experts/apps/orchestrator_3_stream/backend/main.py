@@ -29,6 +29,7 @@ from modules import database
 from modules.orchestrator_service import OrchestratorService, get_orchestrator_tools
 from modules.agent_manager import AgentManager
 from modules.orch_database_models import OrchestratorAgent
+from modules.request_guards import origin_allowed, path_inside
 from modules.autocomplete_service import AutocompleteService
 from modules.autocomplete_models import (
     AutocompleteGenerateRequest,
@@ -201,7 +202,8 @@ app.add_middleware(
 class LoadChatRequest(BaseModel):
     """Request model for loading chat history"""
 
-    orchestrator_agent_id: str
+    # Ignored: the server's own orchestrator is used. Kept so older clients still validate.
+    orchestrator_agent_id: Optional[str] = None
     limit: Optional[int] = 50
 
 
@@ -209,7 +211,8 @@ class SendChatRequest(BaseModel):
     """Request model for sending chat message"""
 
     message: str
-    orchestrator_agent_id: str
+    # Ignored: the server's own orchestrator is used. Kept so older clients still validate.
+    orchestrator_agent_id: Optional[str] = None
 
 
 # ═══════════════════════════════════════════════════════════
@@ -348,7 +351,15 @@ async def open_file_in_ide(request: OpenFileRequest):
                 "message": "IDE integration is disabled in configuration"
             }
 
-        file_path = request.file_path
+        # Only files inside the orchestrator working directory may be opened
+        resolved = path_inside(request.file_path, config.get_working_dir())
+        if resolved is None:
+            logger.http_request("POST", "/api/open-file", 403)
+            return {
+                "status": "error",
+                "message": "File is outside the orchestrator working directory",
+            }
+        file_path = str(resolved)
 
         # Validate file exists
         if not os.path.exists(file_path):
@@ -415,7 +426,7 @@ async def load_chat(request: LoadChatRequest):
 
         service: OrchestratorService = app.state.orchestrator_service
         result = await service.load_chat_history(
-            orchestrator_agent_id=request.orchestrator_agent_id, limit=request.limit
+            orchestrator_agent_id=str(app.state.orchestrator.id), limit=request.limit
         )
 
         logger.http_request("POST", "/load_chat", 200)
@@ -451,7 +462,7 @@ async def send_chat(request: SendChatRequest):
         asyncio.create_task(
             service.process_user_message(
                 user_message=request.message,
-                orchestrator_agent_id=request.orchestrator_agent_id,
+                orchestrator_agent_id=str(app.state.orchestrator.id),
             )
         )
 
@@ -664,6 +675,13 @@ async def autocomplete_update(request: AutocompleteUpdateRequest):
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint for real-time updates and chat messages"""
+
+    # CORS does not cover WebSockets: refuse handshakes from other sites
+    origin = websocket.headers.get("origin")
+    if not origin_allowed(origin, config.CORS_ORIGINS):
+        logger.warning(f"Rejected WebSocket handshake from origin: {origin}")
+        await websocket.close(code=1008)
+        return
 
     await ws_manager.connect(websocket)
 

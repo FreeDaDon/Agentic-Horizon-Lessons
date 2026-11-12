@@ -50,6 +50,8 @@ from rich.table import Table
 from rich.prompt import Confirm
 import subprocess
 
+from psql_cli import psql_invocation
+
 console = Console()
 
 # Available tables in the database
@@ -110,6 +112,13 @@ def check_psql_installed():
         )
         console.print("Install PostgreSQL client tools to use this script")
         sys.exit(1)
+
+
+def drop_table_sql(table_name: str) -> str:
+    """DROP statement for one known table; anything else is refused before it reaches SQL."""
+    if table_name not in AVAILABLE_TABLES:
+        raise ValueError(f"Unknown table: {table_name!r}")
+    return f"DROP TABLE IF EXISTS {table_name} CASCADE;"
 
 
 def list_tables():
@@ -192,15 +201,9 @@ def drop_tables(tables: List[str], database_url: str, skip_confirmation: bool = 
     succeeded = []
 
     for table_name in tables:
-        # Generate DROP TABLE SQL
-        drop_sql = f"DROP TABLE IF EXISTS {table_name} CASCADE;"
-
         # Execute via psql
-        result = subprocess.run(
-            ["psql", database_url, "-c", drop_sql],
-            capture_output=True,
-            text=True,
-        )
+        argv, env = psql_invocation(database_url, "-c", drop_table_sql(table_name))
+        result = subprocess.run(argv, env=env, capture_output=True, text=True)
 
         if result.returncode == 0:
             console.print(f"[green]✓[/green] Dropped: {table_name}")

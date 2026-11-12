@@ -6,7 +6,6 @@ import time
 import uuid
 from claude_agent_sdk import (
     ClaudeSDKClient,
-    ClaudeAgentOptions,
     AssistantMessage,
     SystemMessage,
     TextBlock,
@@ -18,7 +17,8 @@ from .autocomplete_models import (
     PreviousCompletionNone,
     PreviousCompletionAutocomplete,
 )
-from . import database
+from . import config, database
+from .tool_policy import text_only_options
 
 # Maximum number of codebase files to include in autocomplete context
 # Captures all files from git but only sends first N to keep prompt size manageable
@@ -183,10 +183,11 @@ class AutocompleteAgent:
             f.write(placeholder_system_prompt)
         self.logger.debug(f"Working directory: {self.working_dir}")
 
-        # Build ClaudeAgentOptions
+        # Build ClaudeAgentOptions. The prompt carries whatever the user typed,
+        # so the session answers with text only: no tools, one turn.
         options_dict = {
             "system_prompt": placeholder_system_prompt,
-            "model": "haiku",  # LATEST HAIKU MODEL
+            "model": config.FAST_MODEL,
             "cwd": self.working_dir,
         }
 
@@ -202,7 +203,7 @@ class AutocompleteAgent:
             )
 
         # Create client
-        self.client = ClaudeSDKClient(ClaudeAgentOptions(**options_dict))
+        self.client = ClaudeSDKClient(text_only_options(**options_dict))
         self.logger.success("Claude Agent SDK client initialized successfully")
 
     def _save_expertise(self):

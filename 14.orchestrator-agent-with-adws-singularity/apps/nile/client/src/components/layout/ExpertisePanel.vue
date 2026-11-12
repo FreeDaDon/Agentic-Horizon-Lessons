@@ -1,30 +1,21 @@
 <script setup lang="ts">
 import { ref, watch, computed } from 'vue';
-import { marked } from 'marked';
 import { useExpertiseStore } from '../../stores/expertise';
+import { renderMarkdown } from '../../utils/markdown';
 
 const expertiseStore = useExpertiseStore();
 
 // Toggle for raw vs pretty markdown
 const showRawPrompt = ref(false);
 
-// Configure marked for safe rendering
-marked.setOptions({
-  breaks: true,
-  gfm: true,
-});
+// The prompts embed user activity and product data, so render them sanitized
+const renderedSystemPrompt = computed(() =>
+  renderMarkdown(expertiseStore.liveSystemPrompt?.system_prompt ?? '')
+);
 
-// Render system prompt as HTML
-const renderedSystemPrompt = computed(() => {
-  if (!expertiseStore.liveSystemPrompt?.system_prompt) return '';
-  return marked(expertiseStore.liveSystemPrompt.system_prompt) as string;
-});
-
-// Render user prompt as HTML
-const renderedUserPrompt = computed(() => {
-  if (!expertiseStore.liveSystemPrompt?.user_prompt) return '';
-  return marked(expertiseStore.liveSystemPrompt.user_prompt) as string;
-});
+const renderedUserPrompt = computed(() =>
+  renderMarkdown(expertiseStore.liveSystemPrompt?.user_prompt ?? '')
+);
 
 // Format expertise data as JSON blob
 const expertiseJson = computed(() => {

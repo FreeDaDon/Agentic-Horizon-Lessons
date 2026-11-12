@@ -1,5 +1,7 @@
 # Orchestrator 3 Stream Backend - Architecture Summary
 
+> **Snapshot note:** this document predates the repo hardening. `backend/modules/hooks.py` was unused and has been removed; hook logic lives in `command_agent_hooks.py` and `orchestrator_hooks.py`. Tool policy is in `tool_policy.py` and request guards in `request_guards.py`. The module docstrings are the current reference.
+
 ## Key Backend Nodes - Quick Reference
 
 - **main.py**: FastAPI application entry point that defines all REST endpoints and WebSocket connection management.

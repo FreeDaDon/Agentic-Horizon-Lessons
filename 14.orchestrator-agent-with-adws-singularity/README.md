@@ -54,7 +54,7 @@ Workflows are **composable**—mix and match steps for your use case:
 | `plan_build_review`     | 3     | Quality-focused—adds risk-tiered code review after building |
 | `plan_build_review_fix` | 4     | Full automation—automatically fixes issues found in review  |
 
-**Build your own**: Create `adw_<your_workflow>.py` by composing steps. Want `plan_build_test`? Copy a workflow, swap `/review` for `/test`. The pattern is the product.
+**Build your own**: create `adw_<your_workflow>.py` with a `STEPS` list of step functions from `adw_modules/adw_steps.py` and hand it to `run_cli`. Each existing workflow is about 20 lines. The orchestrator discovers the new file by glob. See [lab 6](../06_building_agentic_layers/lab.md). The pattern is the product.
 
 ### How It Works
 
@@ -64,10 +64,12 @@ Workflows are **composable**—mix and match steps for your use case:
 3. SPAWN     →  Background process: `uv run adws/adw_workflows/adw_plan_build.py --adw-id <uuid>`
 4. EXECUTE   →  Workflow runs steps sequentially, each step:
                 - Creates an agent record
-                - Runs a slash command (/plan, /build, /review, /fix)
-                - Logs events to agent_logs table
-                - Broadcasts via WebSocket in real-time
-5. COMPLETE  →  ADW marked complete/failed, duration recorded
+                - Runs a slash command (/plan, /build, /review, /fix) with its own
+                  permission mode, tool list, turn cap, dollar cap and wall-clock timeout
+                - Returns plan paths and review verdicts through submit_plan / submit_review tools
+                - Logs events to agent_logs table and broadcasts via WebSocket
+5. COMPLETE  →  ADW marked completed, failed (a failing review fails it) or cancelled;
+                plan path, reviews and cost stored in output_data; process log in agents/adw/<id>/run.log
 ```
 
 ### Architecture
@@ -75,7 +77,10 @@ Workflows are **composable**—mix and match steps for your use case:
 ```
 adws/
 ├── adw_modules/           # Core infrastructure
-│   ├── adw_agent_sdk.py   # Typed Pydantic wrapper for Claude Agent SDK
+│   ├── adw_steps.py       # Shared step runner: step profiles, caps, submit tools, fix loop
+│   ├── adw_agent_sdk.py   # Typed Pydantic wrapper for Claude Agent SDK (no bypass mode)
+│   ├── adw_plan.py        # Plan-path validation
+│   ├── adw_review.py      # Fail-closed verdict parsing (fallback only)
 │   ├── adw_logging.py     # Step lifecycle logging (log_step_start, log_step_end)
 │   ├── adw_websockets.py  # Real-time WebSocket broadcasting to frontend
 │   ├── adw_summarizer.py  # AI-powered event summaries using Claude Haiku
@@ -84,11 +89,11 @@ adws/
 ├── adw_workflows/         # Multi-step workflow implementations
 │   ├── adw_plan_build.py           # 2-step: /plan → /build
 │   ├── adw_plan_build_review.py    # 3-step: /plan → /build → /review
-│   └── adw_plan_build_review_fix.py # 4-step: /plan → /build → /review → /fix
+│   └── adw_plan_build_review_fix.py # /plan → /build → /review ⇄ /fix (max_fix_rounds, then escalate)
 │
 └── adw_triggers/          # How workflows get started
     ├── adw_manual_trigger.py  # CLI trigger for testing
-    └── adw_scripts.py         # Spawns background processes via `uv run`
+    └── adw_scripts.py         # Spawns `uv run` in its own process group; cancel_adw kills the group
 ```
 
 ### The ADW UI: Swimlane Visualization
@@ -660,7 +665,6 @@ multi-agent-orchestration/
 │   │   │   ├── 7_triggers.sql
 │   │   │   └── 8_orchestrator_chat.sql
 │   │   ├── run_migrations.py     # Apply migrations to database
-│   │   ├── sync_models.py        # Sync models to apps
 │   │   └── README.md             # Database documentation
 │   │
 │   └── orchestrator_3_stream/    # Web orchestrator application
@@ -861,8 +865,8 @@ uv run apps/orchestrator_db/run_migrations.py
 # 3. Update models if needed
 code apps/orchestrator_db/models.py
 
-# 4. Sync models to apps
-uv run apps/orchestrator_db/sync_models.py
+# 4. Copy models to the backend
+cp apps/orchestrator_db/models.py apps/orchestrator_3_stream/backend/modules/orch_database_models.py
 ```
 
 ### Adding New Features

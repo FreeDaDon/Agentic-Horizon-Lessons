@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .config import API_PREFIX, CORS_ORIGINS
+from .config import API_PREFIX, CORS_ORIGINS, CORS_ORIGIN_REGEX
 from .database import init_db, get_db
 from .routers import (
     auth_router,
@@ -19,6 +19,7 @@ from .routers import (
 from .services.websocket_manager import home_ws_manager
 from .services.agent_expert import ShoppingAgentExpert
 from .models import Expertise
+from .sessions import authorize_websocket
 
 
 @asynccontextmanager
@@ -42,7 +43,8 @@ app = FastAPI(
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Allow all for development
+    allow_origins=[origin for origin in CORS_ORIGINS if "*" not in origin],
+    allow_origin_regex=CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -83,7 +85,8 @@ async def websocket_home_stream(websocket: WebSocket, user_id: int):
     WebSocket endpoint for streaming personalized home page sections.
 
     Flow:
-    1. Frontend connects to /ws/home/{user_id}
+    1. Frontend connects to /ws/home/{user_id}?token=<session token>
+       (the handshake is closed with 4401/4403 unless the token belongs to user_id)
     2. Backend accepts connection and starts agent
     3. Agent calls stream_section tool for each section
     4. Each section is immediately pushed to frontend via WebSocket
@@ -91,6 +94,9 @@ async def websocket_home_stream(websocket: WebSocket, user_id: int):
     """
     from sqlalchemy import select
     from .database import async_session
+
+    if not await authorize_websocket(websocket, user_id):
+        return
 
     await home_ws_manager.connect(user_id, websocket)
 

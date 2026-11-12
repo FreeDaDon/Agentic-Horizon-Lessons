@@ -1,26 +1,16 @@
 """Home page router with Agent Expert integration."""
 import random
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from ..database import get_db
+from ..sessions import current_user_id
 from ..models import Product, Expertise
 from ..schemas import HomePageResponse, HomeSection, ProductResponse
 
 router = APIRouter(prefix="/home", tags=["home"])
-
-
-async def get_current_user_id(x_user_id: Optional[str] = Header(None)) -> int:
-    """Extract user ID from header."""
-    if not x_user_id:
-        raise HTTPException(status_code=401, detail="User ID required in X-User-Id header")
-    try:
-        return int(x_user_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
 
 
 async def get_random_products(db: AsyncSession, limit: int = 8) -> list:
@@ -68,7 +58,7 @@ async def generate_generic_home(db: AsyncSession) -> HomePageResponse:
 
 @router.get("", response_model=HomePageResponse)
 async def get_home_page(
-    user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get home page - returns generic content. Use WebSocket streaming for personalized content."""
@@ -80,7 +70,7 @@ async def get_home_page(
 @router.get("/autocomplete")
 async def get_search_autocomplete(
     q: str,
-    user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get personalized search autocomplete suggestions."""

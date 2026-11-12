@@ -78,7 +78,7 @@ def get_orchestrator_tools() -> List[str]:
         List of tool signatures in TypeScript function format
     """
     return [
-        "create_agent(name: string, system_prompt?: string, model?: string, subagent_template?: string)",
+        "create_agent(name: string, system_prompt?: string, model?: string, subagent_template?: string, tools?: string[])",
         "list_agents()",
         "command_agent(agent_name: string, command: string)",
         "check_agent_status(agent_name: string, tail_count = 10, offset = 0, verbose_logs = false)",

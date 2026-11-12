@@ -1,7 +1,7 @@
 // Cart store
 import { defineStore } from 'pinia';
 import { ref, computed } from 'vue';
-import type { CartItem, CartResponse } from '../types';
+import type { CartItem } from '../types';
 import api from '../services/api';
 
 export const useCartStore = defineStore('cart', () => {

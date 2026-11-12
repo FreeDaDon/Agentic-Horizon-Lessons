@@ -1,5 +1,7 @@
 # Backend Modules Reference Guide
 
+> **Snapshot note:** this document predates the repo hardening. `backend/modules/hooks.py` was unused and has been removed; hook logic lives in `command_agent_hooks.py` and `orchestrator_hooks.py`. Tool policy is in `tool_policy.py` and request guards in `request_guards.py`. The module docstrings are the current reference.
+
 ## Module Specification Table
 
 | Module | File | LOC | Purpose | Key Responsibilities | Main Classes/Functions | Key Dependencies |

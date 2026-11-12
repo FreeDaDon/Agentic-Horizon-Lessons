@@ -11,7 +11,7 @@ overview:
 core_implementation:
   websocket_manager:
     file: "apps/orchestrator_3_stream/backend/modules/websocket_manager.py"
-    lines: 260
+    lines: 310
     purpose: "Centralized connection manager and event broadcaster"
 
     state_management:
@@ -51,7 +51,7 @@ core_implementation:
         lines: "82-111"
         behavior: "Send JSON to all connected clients (with optional exclude)"
         error_handling: "Tracks disconnected clients, cleans up after broadcast"
-        concurrency: "Safe for concurrent calls"
+        concurrency: "Iterates a snapshot of active_connections, so connects and disconnects during a broadcast cannot skip or crash it; no lock"
 
   fastapi_endpoint:
     file: "apps/orchestrator_3_stream/backend/main.py"
@@ -61,14 +61,11 @@ core_implementation:
     handler_flow:
       - "await ws_manager.connect(websocket)"
       - "Enter infinite receive loop"
-      - "Parse incoming JSON by 'type' field"
-      - "Handle keep-alive pings"
+      - "Log each incoming message; no message type gets special handling"
       - "Catch WebSocketDisconnect and cleanup"
 
     incoming_message_types:
-      - "ping"
-      - "heartbeat"
-      - "client_message (future use)"
+      - "none handled: client messages are logged and ignored"
 
     error_handling:
       - "WebSocketDisconnect: Graceful cleanup"
@@ -445,7 +442,7 @@ frontend_integration:
   state_management:
     store: "orchestratorStore.ts (Pinia)"
     file: "frontend/src/stores/orchestratorStore.ts"
-    lines: 1132
+    lines: 1545
     pattern: "Unidirectional data flow"
 
     session_state:
@@ -463,16 +460,16 @@ frontend_integration:
 
     websocket_actions:
       incrementWebSocketEventCount:
-        lines: "316-318"
+        lines: "700-702"
         purpose: "Increments session event counter by 1"
         called_from: "onMessageReceived callback (line 337-339)"
 
       connectWebSocket:
-        lines: "320-399"
+        lines: "704-783"
         counter_behavior: "Resets websocketEventCount to 0 on connection (line 388)"
 
       disconnectWebSocket:
-        lines: "401-419"
+        lines: "791-809"
         counter_behavior: "Resets websocketEventCount to 0 on disconnect (line 409)"
 
     components:
@@ -509,7 +506,7 @@ frontend_integration:
     useHeaderBar:
       file: "frontend/src/composables/useHeaderBar.ts"
       purpose: "Aggregates header statistics including WebSocket event count"
-      websocket_counter:
+      websocketEventCount:
         lines: "106-108"
         implementation: "computed(() => store.websocketEventCount)"
         purpose: "Exposes session WebSocket event count to header component"
@@ -638,7 +635,6 @@ key_file_locations:
   hooks:
     orchestrator_hooks: "apps/orchestrator_3_stream/backend/modules/orchestrator_hooks.py"
     command_agent_hooks: "apps/orchestrator_3_stream/backend/modules/command_agent_hooks.py"
-    base_hooks: "apps/orchestrator_3_stream/backend/modules/hooks.py"
 
   services:
     orchestrator_service: "apps/orchestrator_3_stream/backend/modules/orchestrator_service.py (1009 lines total, process_user_message: 435-930)"

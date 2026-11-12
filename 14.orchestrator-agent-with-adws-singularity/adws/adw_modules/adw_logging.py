@@ -1,9 +1,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "asyncpg>=0.29.0",
-#   "python-dotenv>=1.0.0",
-#   "websockets>=12.0",
+#   "asyncpg==0.30.0",
+#   "python-dotenv==1.2.1",
+#   "websockets==15.0.1",
 # ]
 # ///
 """

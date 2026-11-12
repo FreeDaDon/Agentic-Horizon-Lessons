@@ -33,7 +33,7 @@ async def hook(input_data, tool_use_id, context):             # one factory per 
 | `orchestrator_chat` | user ↔ orchestrator conversation |
 | `ai_developer_workflows` | ADW state (lesson 14; see [pillar 6](../06_building_agentic_layers/adw-layers.md)) |
 
-Pydantic `models.py` is the source of truth; `sync_models.py` copies it into each app. Rule from `CLAUDE.md`: **keep models in sync with migrations.**
+Pydantic `models.py` is the source of truth; the backend keeps a copy at `backend/modules/orch_database_models.py` (refresh it with `cp apps/orchestrator_db/models.py apps/orchestrator_3_stream/backend/modules/orch_database_models.py`). Rule from `CLAUDE.md`: **keep models in sync with migrations.**
 
 ## WebSocket event types
 

@@ -64,7 +64,7 @@ FRONTEND_URL = f"http://{FRONTEND_HOST}:{FRONTEND_PORT}"
 
 # PostgreSQL connection string from environment
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://localhost:5432/orchestrator")
-DATABASE_POOL_SIZE = int(os.getenv("DATABASE_POOL_SIZE", "10"))
+DATABASE_POOL_SIZE = int(os.getenv("DATABASE_POOL_SIZE", "20"))
 DATABASE_MAX_OVERFLOW = int(os.getenv("DATABASE_MAX_OVERFLOW", "20"))
 
 # ============================================================================
@@ -78,9 +78,12 @@ LOG_DIR = Path(os.getenv("LOG_DIR", "backend/logs"))
 # CORS CONFIGURATION
 # ============================================================================
 
-CORS_ORIGINS = os.getenv(
-    "CORS_ORIGINS", f"http://{FRONTEND_HOST}:{FRONTEND_PORT}"
-).split(",")
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS", f"http://{FRONTEND_HOST}:{FRONTEND_PORT}"
+    ).split(",")
+]
 
 # ============================================================================
 # AGENT CONFIGURATION
@@ -89,7 +92,8 @@ CORS_ORIGINS = os.getenv(
 # Default model for agents
 DEFAULT_MODEL = "sonnet"
 
-FAST_MODEL = "haiku"
+# Model for summaries and autocomplete
+FAST_MODEL = os.getenv("FAST_MODEL", "haiku")
 
 # Available models
 AVAILABLE_MODELS = ["sonnet", "haiku"]

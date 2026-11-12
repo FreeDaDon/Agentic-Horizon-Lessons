@@ -1,5 +1,7 @@
 # Backend Documentation Index
 
+> **Snapshot note:** this document predates the repo hardening. `backend/modules/hooks.py` was unused and has been removed; hook logic lives in `command_agent_hooks.py` and `orchestrator_hooks.py`. Tool policy is in `tool_policy.py` and request guards in `request_guards.py`. The module docstrings are the current reference.
+
 ## Overview
 
 Complete technical documentation for the Orchestrator 3 Stream backend architecture, covering all modules, services, data flows, and design patterns.

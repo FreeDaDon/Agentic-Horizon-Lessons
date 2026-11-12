@@ -6,6 +6,11 @@ export interface User {
   created_at: string;
 }
 
+export interface Session {
+  user: User;
+  token: string;
+}
+
 export interface Review {
   id: number;
   review_text: string;

@@ -1,0 +1,8 @@
+prompt: >-
+  stats.summarize([]) crashes. Make it return
+  {"count": 0, "min": None, "max": None, "mean": None} for empty input. Results for
+  non-empty input must not change.
+grader: ["{python}", "-m", "pytest", "-q", "-p", "no:cacheprovider", "--noconftest", "test_hidden_stats.py"]
+timeout_s: 300
+max_turns: 10
+max_budget_usd: 0.5

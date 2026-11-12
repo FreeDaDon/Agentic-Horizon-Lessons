@@ -100,7 +100,9 @@ class WebSocketManager:
 
         disconnected = []
 
-        for connection in self.active_connections:
+        # Iterate a snapshot: connect/disconnect can change the list while
+        # this coroutine is suspended in send_json.
+        for connection in list(self.active_connections):
             if connection == exclude:
                 continue
 

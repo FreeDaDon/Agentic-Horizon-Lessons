@@ -80,7 +80,15 @@ CREATE INDEX IF NOT EXISTS idx_adw_created ON ai_developer_workflows(created_at 
 CREATE INDEX IF NOT EXISTS idx_adw_active ON ai_developer_workflows(orchestrator_agent_id, status)
     WHERE status IN ('pending', 'in_progress');
 
--- Trigger for updated_at (uses existing function from 6_functions.sql)
+-- Trigger for updated_at. 6_functions.sql defines only per-table functions, so define the generic one here.
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
 DROP TRIGGER IF EXISTS update_ai_developer_workflows_updated_at ON ai_developer_workflows;
 CREATE TRIGGER update_ai_developer_workflows_updated_at
     BEFORE UPDATE ON ai_developer_workflows

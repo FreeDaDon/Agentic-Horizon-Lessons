@@ -51,7 +51,7 @@ core_implementation:
         lines: "82-111"
         behavior: "Send JSON to all connected clients (with optional exclude)"
         error_handling: "Tracks disconnected clients, cleans up after broadcast"
-        concurrency: "Safe for concurrent calls"
+        concurrency: "Iterates a snapshot of active_connections, so connects and disconnects during a broadcast cannot skip or crash it; no lock"
 
   fastapi_endpoint:
     file: "apps/orchestrator_3_stream/backend/main.py"
@@ -61,14 +61,11 @@ core_implementation:
     handler_flow:
       - "await ws_manager.connect(websocket)"
       - "Enter infinite receive loop"
-      - "Parse incoming JSON by 'type' field"
-      - "Handle keep-alive pings"
+      - "Log each incoming message; no message type gets special handling"
       - "Catch WebSocketDisconnect and cleanup"
 
     incoming_message_types:
-      - "ping"
-      - "heartbeat"
-      - "client_message (future use)"
+      - "none handled: client messages are logged and ignored"
 
     error_handling:
       - "WebSocketDisconnect: Graceful cleanup"
@@ -509,7 +506,7 @@ frontend_integration:
     useHeaderBar:
       file: "frontend/src/composables/useHeaderBar.ts"
       purpose: "Aggregates header statistics including WebSocket event count"
-      websocket_counter:
+      websocketEventCount:
         lines: "106-108"
         implementation: "computed(() => store.websocketEventCount)"
         purpose: "Exposes session WebSocket event count to header component"
@@ -638,7 +635,6 @@ key_file_locations:
   hooks:
     orchestrator_hooks: "apps/orchestrator_3_stream/backend/modules/orchestrator_hooks.py"
     command_agent_hooks: "apps/orchestrator_3_stream/backend/modules/command_agent_hooks.py"
-    base_hooks: "apps/orchestrator_3_stream/backend/modules/hooks.py"
 
   services:
     orchestrator_service: "apps/orchestrator_3_stream/backend/modules/orchestrator_service.py (1009 lines total, process_user_message: 435-930)"

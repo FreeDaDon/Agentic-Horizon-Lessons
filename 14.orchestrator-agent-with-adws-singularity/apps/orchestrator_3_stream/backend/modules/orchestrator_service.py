@@ -44,6 +44,7 @@ from .websocket_manager import WebSocketManager
 from .logger import OrchestratorLogger
 from . import config
 from .subagent_loader import SubagentRegistry
+from .adw_bridge import discover_workflows
 
 # Hook imports for orchestrator agent event tracking
 from .orchestrator_hooks import (
@@ -79,7 +80,7 @@ def get_orchestrator_tools() -> List[str]:
     """
     return [
         # Agent Management Tools
-        "create_agent(name: string, system_prompt?: string, model?: string, subagent_template?: string)",
+        "create_agent(name: string, system_prompt?: string, model?: string, subagent_template?: string, tools?: string[])",
         "list_agents()",
         "command_agent(agent_name: string, command: string)",
         "check_agent_status(agent_name: string, tail_count = 10, offset = 0, verbose_logs = false)",
@@ -88,8 +89,9 @@ def get_orchestrator_tools() -> List[str]:
         "read_system_logs(offset = 0, limit = 50, message_contains?: string, level?: string)",
         "report_cost()",
         # AI Developer Workflow Tools
-        "start_adw(name_of_adw: string, workflow_type: string, prompt: string, description?: string)",
+        "start_adw(name_of_adw: string, workflow_type: string, prompt: string, description?: string, model?: string, review_model?: string, fix_model?: string, max_budget_usd?: number, max_fix_rounds?: integer)",
         "check_adw(adw_id: string, tail_count = 10, event_type?: string, include_step_details = false)",
+        "cancel_adw(adw_id: string)",
     ]
 
 
@@ -213,21 +215,15 @@ class OrchestratorService:
         if "{{AVAILABLE_ADW_TYPES}}" in prompt_text:
             self.logger.debug("Found {{AVAILABLE_ADW_TYPES}} placeholder in system prompt")
 
-            # Discover available workflow types from adws/adw_workflows/adw_*.py
-            workflow_dir = Path(self.working_dir) / "adws" / "adw_workflows"
-            workflow_types = []
-
-            if workflow_dir.exists():
-                for file in workflow_dir.glob("adw_*.py"):
-                    name = file.stem  # adw_feature-development
-                    if name.startswith("adw_"):
-                        workflow_type = name[4:]  # Remove "adw_" prefix
-                        workflow_types.append(workflow_type)
-                workflow_types.sort()
+            # The runner's own discovery, so the prompt lists exactly what start_adw accepts
+            workflows = discover_workflows()
+            workflow_types = list(workflows)
 
             if workflow_types:
                 # Format as bullet list
-                adw_type_list = "\n".join([f"- `{wt}` → `adws/adw_workflows/adw_{wt}.py`" for wt in workflow_types])
+                adw_type_list = "\n".join(
+                    f"- `{wt}` ({w.total_steps} steps) → {w.description}" for wt, w in workflows.items()
+                )
                 self.logger.info(f"Discovered {len(workflow_types)} ADW workflow type(s)")
             else:
                 adw_type_list = "No workflow types available. Create workflow files in `adws/adw_workflows/adw_*.py` to enable ADWs."
@@ -311,6 +307,7 @@ class OrchestratorService:
                 # ADW tools
                 "mcp__mgmt__start_adw",
                 "mcp__mgmt__check_adw",
+                "mcp__mgmt__cancel_adw",
                 # Standard tools
                 "Bash",
                 "Read",

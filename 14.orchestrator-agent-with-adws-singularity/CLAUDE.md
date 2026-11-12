@@ -41,4 +41,4 @@ If we request a change to a migration file be absolutely sure to update the mode
 ## Avoid dict and prefer pydantic models
 
 - Prefer pydantic models over dicts.
-- For every database model use your `orchestrator_agents_db.py` file to parse and manage the data. If you don't have one, update the `apps/orchestrator_db/sync_models.py` file to sync the `apps/orchestrator_db/models.py` into your app directory where ever you need it.
+- For every database model use the backend's `modules/orch_database_models.py` to parse and manage the data. It is a copy of `apps/orchestrator_db/models.py`: when you change `models.py`, copy it over (`cp apps/orchestrator_db/models.py apps/orchestrator_3_stream/backend/modules/orch_database_models.py`).
