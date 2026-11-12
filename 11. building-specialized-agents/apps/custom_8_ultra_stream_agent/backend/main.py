@@ -40,6 +40,7 @@ from modules.data_types import (
     SessionInformation,
     InspectorQueryRequest,
 )
+from modules.origin_guard import RejectDisallowedOrigins, allowed_origins
 
 # Rich console for beautiful logging
 from rich.console import Console
@@ -51,6 +52,12 @@ console = Console()
 
 # Constants
 TOOL_EMOJI = "🔧"
+MAX_LINES_BEFORE_CONTEXT_CLEAR = 50
+# Browser origins allowed to call the API: the Vite dev server (frontend/vite.config.js).
+# Override with a comma-separated list in ULTRA_STREAM_ALLOWED_ORIGINS.
+ALLOWED_ORIGINS = allowed_origins(
+    "ULTRA_STREAM_ALLOWED_ORIGINS", ["http://localhost:5175", "http://127.0.0.1:5175"]
+)
 
 # Global variables for agent management
 stream_agent_client: Optional[ClaudeSDKClient] = None
@@ -60,6 +67,7 @@ db_path: str = ""  # Will be set based on script location
 jsonl_file_path: str = ""
 current_line_index: int = 0
 lines_processed_in_session: int = 0
+context_clear_requested: bool = False
 raw_log_cache: Dict[int, Dict[str, Any]] = (
     {}
 )  # Cache raw logs by line_index to save tokens
@@ -503,26 +511,16 @@ async def create_alert_message(args: Dict[str, Any]) -> Dict[str, Any]:
 
 @tool("clear_context", "Clear agent context to continue processing", {})
 async def clear_context(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Signal to clear context and reset session"""
+    """Ask for a fresh stream agent session once the current turn ends"""
 
-    global lines_processed_in_session, stream_agent_client
+    global context_clear_requested
 
-    lines_processed_in_session = 0
-
-    # Broadcast context clear event
-    await broadcast_message(
-        {
-            "type": "system_status",
-            "data": {
-                "message": "Stream agent context cleared",
-                "timestamp": datetime.now().isoformat(),
-            },
-        }
-    )
+    # The agent is mid-turn inside this tool, so its client cannot be replaced here.
+    context_clear_requested = True
 
     console.print(
         Panel(
-            "🔄 Context cleared - ready for continued processing",
+            "🔄 Context clear requested - a fresh session starts after this turn",
             title=f"{TOOL_EMOJI} stream_agent: clear_context {TOOL_EMOJI}",
             style="blue",
         )
@@ -535,7 +533,7 @@ async def clear_context(args: Dict[str, Any]) -> Dict[str, Any]:
                 "text": json.dumps(
                     {
                         "end_line_index": current_line_index,
-                        "message": "Context cleared successfully",
+                        "message": "Context will be cleared after this turn",
                     }
                 ),
             }
@@ -816,6 +814,10 @@ async def initialize_stream_agent(resume_session=True):
         if resume_session and session_info.stream_agent_session_id
         else None
     )
+    if not resume_session:
+        # A restart must not resume the session that was just cleared.
+        session_info.stream_agent_session_id = ""
+        update_session_info(session_info)
 
     console.print(
         Panel(
@@ -858,20 +860,8 @@ async def initialize_stream_agent(resume_session=True):
     )
 
     stream_agent_client = ClaudeSDKClient(options=options)
-
-    # Create streaming input format required for initial connection
-    async def create_initial_message():
-        # If resuming, start with the current index
-        initial_prompt = str(session_info.current_line_index) if resume_session else "0"
-        yield {
-            "type": "user",
-            "message": {"role": "user", "content": initial_prompt},
-        }
-
-    # Connect with initial message
-    await stream_agent_client.connect(
-        create_initial_message() if not resume_session else None
-    )
+    # No initial prompt: run_stream_agent_turn sends the current line index.
+    await stream_agent_client.connect()
 
     console.print(
         Panel(
@@ -969,53 +959,73 @@ async def initialize_inspector_agent(resume_session=True):
     )
 
 
+async def start_fresh_stream_session():
+    """Replace the stream agent with one on a new session, dropping its context"""
+
+    global lines_processed_in_session, context_clear_requested
+
+    console.print(
+        Panel(
+            f"Clearing context after {lines_processed_in_session} lines",
+            title="run_stream_agent",
+            style="yellow",
+        )
+    )
+    await stream_agent_client.disconnect()
+    await initialize_stream_agent(resume_session=False)
+    lines_processed_in_session = 0
+    context_clear_requested = False
+
+    await broadcast_message(
+        {
+            "type": "system_status",
+            "data": {
+                "message": "Stream agent context cleared",
+                "timestamp": datetime.now().isoformat(),
+            },
+        }
+    )
+
+
+async def run_stream_agent_turn():
+    """Send the current line index to the Stream Agent and process its whole response"""
+
+    global lines_processed_in_session
+
+    start_index = current_line_index
+    await stream_agent_client.query(str(start_index))
+
+    async for message in stream_agent_client.receive_response():
+        # CRITICAL: Capture session_id from ResultMessage for continuity
+        if isinstance(message, ResultMessage) and message.session_id:
+            session_info = get_session_info()
+            if session_info.stream_agent_session_id != message.session_id:
+                session_info.stream_agent_session_id = message.session_id
+                update_session_info(session_info)
+                console.print(
+                    Panel(
+                        f"✓ Stream Agent session ID updated: {message.session_id}",
+                        title="run_stream_agent",
+                        style="green",
+                    )
+                )
+
+    # produce_summarized_log advances current_line_index once per line summarized.
+    lines_processed_in_session += current_line_index - start_index
+
+    if (
+        context_clear_requested
+        or lines_processed_in_session >= MAX_LINES_BEFORE_CONTEXT_CLEAR
+    ):
+        await start_fresh_stream_session()
+
+
 async def run_stream_agent():
     """Run the Stream Agent processing loop"""
 
-    global stream_agent_client, current_line_index, lines_processed_in_session
-
     while stream_agent_client:
         try:
-            # Send current line index to agent
-            await stream_agent_client.query(str(current_line_index))
-
-            # Process agent response
-            async for message in stream_agent_client.receive_response():
-                if isinstance(message, AssistantMessage):
-                    # Agent will use tools automatically
-                    pass
-                elif isinstance(message, ResultMessage):
-                    # CRITICAL: Capture session_id from ResultMessage for continuity
-                    if message.session_id:
-                        session_info = get_session_info()
-                        if session_info.stream_agent_session_id != message.session_id:
-                            session_info.stream_agent_session_id = message.session_id
-                            update_session_info(session_info)
-                            console.print(
-                                Panel(
-                                    f"✓ Stream Agent session ID updated: {message.session_id}",
-                                    title="run_stream_agent",
-                                    style="green",
-                                )
-                            )
-
-                    # Update processed count
-                    lines_processed_in_session += 5  # Approximate
-
-                    # Check if we need to clear context
-                    if lines_processed_in_session >= 50:
-                        console.print(
-                            Panel(
-                                "Approaching context limit, clearing...",
-                                title="run_stream_agent",
-                                style="yellow",
-                            )
-                        )
-                        await stream_agent_client.disconnect()
-                        await initialize_stream_agent(
-                            resume_session=True
-                        )  # Resume after clear
-                        lines_processed_in_session = 0
+            await run_stream_agent_turn()
 
             # Small delay before next iteration
             await asyncio.sleep(0.5)
@@ -1155,11 +1165,12 @@ app = FastAPI(title="Ultra Stream Agent", lifespan=lifespan)
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RejectDisallowedOrigins, allowed=ALLOWED_ORIGINS)
 
 
 # ============= API Endpoints =============

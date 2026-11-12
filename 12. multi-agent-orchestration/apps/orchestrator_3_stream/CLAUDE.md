@@ -50,7 +50,9 @@ apps/orchestrator_3_stream/
 - **modules/logger.py**: OrchestratorLogger class with hourly file rotation + Rich console output
 - **modules/websocket_manager.py**: WebSocketManager class for managing connections and broadcasting events
 - **modules/agent_manager.py**: Manages agent lifecycle and broadcasts agent response blocks (TextBlock, ThinkingBlock, ToolUseBlock) via WebSocket
-- **modules/hooks.py**: Captures Claude SDK events and broadcasts them as agent_log events via WebSocket
+- **modules/command_agent_hooks.py**: Hook factories that capture command agents' Claude SDK events, log them to the database, and broadcast them as agent_log events via WebSocket
+- **modules/tool_policy.py**: Built-in tool lists and the policies that lock summarizer/autocomplete sessions to text only and keep each command agent to the tools fixed at creation
+- **modules/request_guards.py**: Checks for untrusted request input: WebSocket Origin against CORS_ORIGINS, and file paths confined to the working directory
 - **modules/database.py**: Database operations for orchestrator and agents. Added `update_orchestrator_metadata()` function for updating orchestrator metadata JSONB field using PostgreSQL merge operator.
 - **modules/orchestrator_service.py**: Orchestrator service with Claude SDK integration. Enhanced to capture SystemMessage data on first interaction and store it in orchestrator metadata.
 - **tests/**: Backend test scripts for database and WebSocket functionality

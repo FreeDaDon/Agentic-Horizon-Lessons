@@ -1,0 +1,7 @@
+prompt: >-
+  pager.page(items, 1, 10) is meant to return the first ten items, but it skips them.
+  Pages are 1-indexed. Fix the bug in pager.py. Do not change the function signature.
+grader: ["{python}", "-m", "pytest", "-q", "-p", "no:cacheprovider", "--noconftest", "test_hidden_pager.py"]
+timeout_s: 300
+max_turns: 10
+max_budget_usd: 0.5

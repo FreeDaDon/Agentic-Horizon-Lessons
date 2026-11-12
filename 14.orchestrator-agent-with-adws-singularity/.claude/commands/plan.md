@@ -35,6 +35,7 @@ PLAN_OUTPUT_DIRECTORY: `specs/`
 4. Document Plan - Structure a comprehensive markdown document with problem statement, implementation steps, and testing approach
 5. Generate Filename - Create a descriptive kebab-case filename based on the plan's main topic
 6. Save & Report - Follow the `Report` section to write the plan to `PLAN_OUTPUT_DIRECTORY/<filename>.md` and provide a summary of key components
+7. Submit - If the `mcp__adw__submit_plan` tool is available (it is whenever an ADW runs this command), your LAST action MUST be to call it with the path of the plan file you wrote. The workflow builds from that path and from nothing else; if the tool returns an error, fix the path and call it again.
 
 ## Plan Format
 

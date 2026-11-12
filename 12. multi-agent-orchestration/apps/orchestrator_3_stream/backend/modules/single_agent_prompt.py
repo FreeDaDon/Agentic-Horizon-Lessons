@@ -23,16 +23,18 @@ import os
 from pathlib import Path
 from typing import Any, Optional, Dict
 
-from claude_agent_sdk import query, ClaudeAgentOptions, AssistantMessage, TextBlock
+from claude_agent_sdk import query, AssistantMessage, TextBlock
 
+from . import config
 from .logger import OrchestratorLogger
+from .tool_policy import text_only_options
 
 
 # Configure module logger
 logger = OrchestratorLogger()
 
-# Fast model for summarization (Haiku for speed and cost)
-FAST_MODEL = "haiku"
+# Fast model for summarization (FAST_MODEL env var, Haiku by default)
+FAST_MODEL = config.FAST_MODEL
 
 # Load prompt templates from files
 PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
@@ -124,10 +126,11 @@ async def fast_claude_query(
         if "ANTHROPIC_API_KEY" in os.environ:
             env_vars["ANTHROPIC_API_KEY"] = os.environ["ANTHROPIC_API_KEY"]
 
-        options = ClaudeAgentOptions(
+        # The prompt embeds tool inputs and outputs, which can carry injected
+        # instructions, so this session gets no tools and a single turn.
+        options = text_only_options(
             model=model,
             system_prompt=system_prompt,
-            permission_mode="bypassPermissions",  # No user interaction needed
             env=env_vars,  # Ensure API key is available to subprocess
             cli_path=get_claude_cli_path(),  # Explicit CLI path for Windows compatibility
         )
@@ -162,7 +165,7 @@ async def summarize_event(event_data: dict[str, Any], event_type: str) -> str:
     Generate a concise 1-sentence summary of an agent event.
 
     Takes event data (either hook event or message block) and generates
-    a human-readable summary using fast Claude query. Used by hooks.py
+    a human-readable summary using fast Claude query. Used by command_agent_hooks.py
     and agent_manager.py to populate the summary column in agent_logs table.
 
     Args:

@@ -1,13 +1,13 @@
 """Orders router."""
 from datetime import datetime
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
-from typing import Optional
 
 from ..database import get_db
+from ..sessions import current_user_id
 from ..models import OrderItem, CartItem, Product
 from ..schemas import OrderResponse, OrderItemResponse
 from .expertise import track_action_internal
@@ -15,19 +15,9 @@ from .expertise import track_action_internal
 router = APIRouter(prefix="/orders", tags=["orders"])
 
 
-async def get_current_user_id(x_user_id: Optional[str] = Header(None)) -> int:
-    """Extract user ID from header."""
-    if not x_user_id:
-        raise HTTPException(status_code=401, detail="User ID required in X-User-Id header")
-    try:
-        return int(x_user_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
-
-
 @router.post("/checkout", response_model=OrderResponse)
 async def checkout(
-    user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Checkout - convert cart to order (tracks checkout action for each item)."""
@@ -100,7 +90,7 @@ async def checkout(
 
 @router.get("", response_model=List[OrderResponse])
 async def list_orders(
-    user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """List all orders for user."""
@@ -148,7 +138,7 @@ async def list_orders(
 @router.get("/{order_id}", response_model=OrderResponse)
 async def get_order(
     order_id: str,
-    user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get specific order by ID."""

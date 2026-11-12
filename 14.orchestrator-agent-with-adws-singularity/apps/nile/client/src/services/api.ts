@@ -1,6 +1,7 @@
 // API service for Nile
 import axios, { type AxiosInstance } from 'axios';
 import type {
+  Session,
   User,
   Product,
   CartResponse,
@@ -16,7 +17,8 @@ const API_BASE = import.meta.env.VITE_API_URL || '';
 
 class ApiService {
   private client: AxiosInstance;
-  private userId: number | null = null;
+  private token: string | null = null;
+  private onUnauthorized: (() => void) | null = null;
 
   constructor() {
     this.client = axios.create({
@@ -26,28 +28,46 @@ class ApiService {
       }
     });
 
-    // Add user ID to requests
     this.client.interceptors.request.use((config) => {
-      if (this.userId) {
-        config.headers['X-User-Id'] = String(this.userId);
+      if (this.token) {
+        config.headers['Authorization'] = `Bearer ${this.token}`;
       }
       return config;
     });
+
+    // Tokens live in server memory, so a server restart turns a stored token into a 401
+    this.client.interceptors.response.use(undefined, (error) => {
+      if (error.response?.status === 401 && this.token) {
+        this.onUnauthorized?.();
+      }
+      return Promise.reject(error);
+    });
   }
 
-  setUserId(id: number) {
-    this.userId = id;
+  setToken(token: string | null) {
+    this.token = token;
   }
 
-  getUserId(): number | null {
-    return this.userId;
+  getToken(): string | null {
+    return this.token;
+  }
+
+  setUnauthorizedHandler(handler: () => void) {
+    this.onUnauthorized = handler;
   }
 
   // Auth
-  async login(name: string): Promise<User> {
-    const { data } = await this.client.post<User>('/auth/login', { name });
-    this.userId = data.id;
-    return data;
+  async login(name: string): Promise<Session> {
+    const { data } = await this.client.post<User & { token: string }>('/auth/login', { name });
+    const { token, ...user } = data;
+    this.token = token;
+    return { user, token };
+  }
+
+  async logout(token: string): Promise<void> {
+    await this.client.post('/auth/logout', undefined, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
   }
 
   // Products

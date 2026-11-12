@@ -60,6 +60,7 @@ from .logger import OrchestratorLogger
 from . import config
 from .file_tracker import FileTracker
 from .subagent_loader import SubagentRegistry
+from .tool_policy import command_tool_policy, stored_tool_policy
 
 
 class AgentManager:
@@ -115,8 +116,18 @@ class AgentManager:
 
         @tool(
             "create_agent",
-            "Create a new agent. REQUIRED: name. OPTIONAL: system_prompt (can be empty if using template), model, subagent_template. Use 'fast' for haiku model. If subagent_template is provided, the template's system prompt, tools, and model will be applied automatically.",
-            {"name": str, "system_prompt": str, "model": str, "subagent_template": str},
+            "Create a new agent. REQUIRED: name. OPTIONAL: system_prompt (can be empty if using template), model, subagent_template, tools. Use 'fast' for haiku model. If subagent_template is provided, the template's system prompt, tools, and model will be applied automatically. tools (list of tool names, e.g. [\"Read\", \"Grep\"]) limits the agent to exactly those tools and overrides the template's tools.",
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "system_prompt": {"type": "string"},
+                    "model": {"type": "string"},
+                    "subagent_template": {"type": "string"},
+                    "tools": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["name"],
+            },
         )
         async def create_agent_tool(args: Dict[str, Any]) -> Dict[str, Any]:
             """Tool for creating new agents"""
@@ -125,6 +136,7 @@ class AgentManager:
                 system_prompt = args.get("system_prompt", "")
                 model_input = args.get("model", config.DEFAULT_AGENT_MODEL)
                 subagent_template = args.get("subagent_template")
+                tools = args.get("tools")
 
                 # Model alias mapping
                 model_aliases = {
@@ -165,7 +177,9 @@ class AgentManager:
                         "is_error": True,
                     }
 
-                result = await self.create_agent(name, system_prompt, model, subagent_template)
+                result = await self.create_agent(
+                    name, system_prompt, model, subagent_template, tools=tools
+                )
 
                 if result["ok"]:
                     return {
@@ -398,6 +412,10 @@ class AgentManager:
                         "is_error": True,
                     }
 
+                # Stop a running command before archiving, so it does not keep
+                # working (and spending) as an agent nobody can see.
+                await self._interrupt_active_client(agent.name)
+
                 # Use Pydantic model properties
                 await delete_agent(agent.id)
 
@@ -442,14 +460,7 @@ class AgentManager:
                         "is_error": True,
                     }
 
-                with self.active_clients_lock:
-                    client = self.active_clients.get(agent_name)
-
-                if client:
-                    await client.interrupt()
-                    with self.active_clients_lock:
-                        del self.active_clients[agent_name]
-
+                if await self._interrupt_active_client(agent_name):
                     return {
                         "content": [
                             {
@@ -596,8 +607,22 @@ class AgentManager:
             report_cost_tool,
         ]
 
+    async def _interrupt_active_client(self, agent_name: str) -> bool:
+        """Interrupt the agent's running command, if any, and forget its client."""
+        with self.active_clients_lock:
+            client = self.active_clients.pop(agent_name, None)
+        if client is None:
+            return False
+        await client.interrupt()
+        return True
+
     async def create_agent(
-        self, name: str, system_prompt: str, model: Optional[str] = None, subagent_template: Optional[str] = None
+        self,
+        name: str,
+        system_prompt: str,
+        model: Optional[str] = None,
+        subagent_template: Optional[str] = None,
+        tools: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Create a new agent.
@@ -607,6 +632,9 @@ class AgentManager:
             system_prompt: Agent's system prompt (can be empty if using template)
             model: Optional model override
             subagent_template: Optional template name to use
+            tools: Optional tool allowlist; overrides the template's tools.
+                Stored on the agent with every other built-in disallowed and
+                applied to every command.
 
         Returns:
             Dict with ok, agent_id, session_id, or error
@@ -652,6 +680,10 @@ class AgentManager:
                     self.logger.info(f"Applying template '{template.frontmatter.name}': {tool_count} tools, model={model or 'default'}")
                 else:
                     self.logger.info(f"Applying template '{template.frontmatter.name}': all default tools, model={model or 'default'}")
+
+            if tools is not None:
+                allowed_tools = tools
+            metadata.update(command_tool_policy(allowed_tools))
 
             # Check if agent name already exists (scoped to this orchestrator)
             existing = await get_agent_by_name(self.orchestrator_agent_id, name)
@@ -787,26 +819,8 @@ class AgentManager:
                 agent_id, agent.name, task_slug, entry_counter
             )
 
-            # Default allowed tools - comprehensive set for general work
-            default_allowed = [
-                "Read",
-                "Write",
-                "Edit",
-                "Bash",
-                "Glob",
-                "Grep",
-                "Task",
-                "WebFetch",
-                "WebSearch",
-                "BashOutput",
-                "SlashCommand",
-                "TodoWrite",
-                "KillShell",
-                "AskUserQuestion",
-                "Skill",
-            ]
-
-            default_disallowed = ["NotebookEdit", "ExitPlanMode"]
+            # The tool policy fixed at creation (template or explicit tools)
+            tool_policy = stored_tool_policy(agent.metadata)
 
             # Pass ANTHROPIC_API_KEY explicitly to ensure subprocess has access
             env_vars = {}
@@ -821,8 +835,8 @@ class AgentManager:
                 resume=agent.session_id,
                 hooks=hooks_dict,
                 max_turns=config.MAX_AGENT_TURNS,
-                allowed_tools=default_allowed,
-                disallowed_tools=default_disallowed,
+                allowed_tools=tool_policy["allowed_tools"],
+                disallowed_tools=tool_policy["disallowed_tools"],
                 permission_mode="acceptEdits",
                 env=env_vars,  # Ensure API key is available to subprocess
                 setting_sources=["project"],  # Load CLAUDE.md and slash commands

@@ -20,6 +20,7 @@ from typing import Optional, List, Dict, Any
 from contextlib import asynccontextmanager
 
 from .orch_database_models import Agent, AgentLog
+from . import config
 from .config import DEFAULT_AGENT_LOG_LIMIT, DEFAULT_SYSTEM_LOG_LIMIT, DEFAULT_CHAT_HISTORY_LIMIT
 
 # Global connection pool
@@ -32,15 +33,15 @@ _pool: Optional[asyncpg.Pool] = None
 
 
 async def init_pool(
-    database_url: str = None, min_size: int = 5, max_size: int = 20
+    database_url: str = None, min_size: int = 5, max_size: Optional[int] = None
 ) -> asyncpg.Pool:
     """
     Initialize asyncpg connection pool.
 
     Args:
         database_url: PostgreSQL connection string (from env if not provided)
-        min_size: Minimum pool size
-        max_size: Maximum pool size
+        min_size: Minimum pool size (capped at max_size)
+        max_size: Maximum pool size (DATABASE_POOL_SIZE if not provided)
 
     Returns:
         asyncpg.Pool instance
@@ -57,8 +58,9 @@ async def init_pool(
     if not url:
         raise ValueError("DATABASE_URL environment variable not set")
 
+    max_size = max_size or config.DATABASE_POOL_SIZE
     _pool = await asyncpg.create_pool(
-        url, min_size=min_size, max_size=max_size, command_timeout=60
+        url, min_size=min(min_size, max_size), max_size=max_size, command_timeout=60
     )
 
     return _pool
@@ -922,9 +924,11 @@ async def update_agent_costs(
 
 async def reset_agent_tokens(agent_id: uuid.UUID) -> None:
     """
-    Reset agent's token usage and costs to zero.
+    Reset agent's token counters to zero, keeping total_cost.
 
     Called when /compact is triggered to reset context window tracking.
+    Compaction shrinks the context, not the money already spent, so the
+    cumulative cost stays.
 
     Args:
         agent_id: UUID of the agent to reset
@@ -935,7 +939,6 @@ async def reset_agent_tokens(agent_id: uuid.UUID) -> None:
             UPDATE agents
             SET input_tokens = 0,
                 output_tokens = 0,
-                total_cost = 0.0,
                 updated_at = NOW()
             WHERE id = $1
         """,
@@ -1614,6 +1617,7 @@ async def create_adw(
     description: Optional[str] = None,
     total_steps: int = 0,
     metadata: Optional[Dict[str, Any]] = None,
+    options: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """
     Create a new AI Developer Workflow record.
@@ -1627,12 +1631,13 @@ async def create_adw(
         description: Optional detailed description
         total_steps: Total number of steps (if known upfront)
         metadata: Optional additional metadata
+        options: Optional workflow inputs (models, budget, caps) merged into input_data
 
     Returns:
         Dict with ADW record including id, status, etc.
     """
     # Store prompt and working_dir in input_data so workflows can reload with just adw_id
-    input_data = {"prompt": prompt, "working_dir": working_dir}
+    input_data = {**(options or {}), "prompt": prompt, "working_dir": working_dir}
 
     async with get_connection() as conn:
         row = await conn.fetchrow(
@@ -1657,6 +1662,21 @@ async def create_adw(
             json.dumps(metadata or {}),
         )
         return dict(row)
+
+
+async def merge_adw_metadata(adw_id: uuid.UUID, data: Dict[str, Any]) -> bool:
+    """Merge keys into an ADW's metadata JSONB (e.g. the runner's pid and log path)."""
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """
+            UPDATE ai_developer_workflows
+            SET metadata = COALESCE(metadata, '{}'::jsonb) || $2::jsonb, updated_at = NOW()
+            WHERE id = $1
+            """,
+            adw_id,
+            json.dumps(data),
+        )
+        return result == "UPDATE 1"
 
 
 async def get_adw(adw_id: uuid.UUID) -> Optional[Dict[str, Any]]:

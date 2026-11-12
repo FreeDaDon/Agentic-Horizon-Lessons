@@ -1,8 +1,7 @@
 ---
-allowed-tools: Write, Read, Bash, Grep, Glob
+allowed-tools: Write, Read, Grep, Glob, Bash(git diff:*), Bash(git status:*), Bash(git log:*), Bash(git show:*), mcp__adw__submit_review
 description: Reviews completed work by analyzing git diffs and produces risk-tiered validation reports
 argument-hint: [user prompt describing work], [path to plan file]
-model: opus
 ---
 
 # Review Agent
@@ -26,7 +25,8 @@ REVIEW_OUTPUT_DIRECTORY: `app_review/`
 - Categorize every issue into one of four risk tiers: Blocker, High Risk, Medium Risk, or Low Risk.
 - For each issue, provide 1-3 recommended solutions. Use just 1 solution if it's obvious, up to 3 if there are multiple valid approaches.
 - Include exact file paths, line numbers, and offending code snippets for every issue.
-- Write all reports to the `REVIEW_OUTPUT_DIRECTORY` with timestamps for traceability.
+- Write all reports to the `REVIEW_OUTPUT_DIRECTORY` with timestamps for traceability. **Exception**: if the `mcp__adw__submit_review` tool is available (it is whenever an ADW runs this command), do NOT write any file. Your LAST action MUST be to call `mcp__adw__submit_review` with `verdict` (PASS or FAIL), `report` (the full markdown report below) and `blocker_count` (the number of BLOCKER issues). The workflow writes the report and acts only on that call. If the tool returns an error, correct the arguments and call it again.
+- Your only shell access is read-only git (`git diff`, `git status`, `git log`, `git show`). Do not try to run builds or tests; list the plan's validation commands under Plan Compliance Check as "not run by review".
 - End every report with a clear PASS or FAIL verdict based on whether blockers exist.
 - Never make assumptions—if you can't verify something through git diff or file inspection, flag it as requiring manual review.
 - Be thorough but concise—engineers need actionable insights, not verbose commentary.
@@ -80,9 +80,9 @@ REVIEW_OUTPUT_DIRECTORY: `app_review/`
 
 6. **Document Each Issue with Precision** - For every issue identified, capture: Description (clear, concise summary), Location (absolute file path, specific line numbers), Code (exact offending code snippet), Solutions (1-3 actionable recommendations ranked by preference).
 
-7. **Generate the Report** - Structure your report following the Report section format below. Start with a quick-reference summary table, organize issues by risk tier (Blockers first, Low Risk last), within each tier order by file path for easy navigation, include a final Pass/Fail verdict, write the report to `REVIEW_OUTPUT_DIRECTORY/review_<timestamp>.md`.
+7. **Generate the Report** - Structure your report following the Report section format below. Start with a quick-reference summary table, organize issues by risk tier (Blockers first, Low Risk last), within each tier order by file path for easy navigation, include a final Pass/Fail verdict. If `mcp__adw__submit_review` is available, go to step 8; otherwise write the report to `REVIEW_OUTPUT_DIRECTORY/review_<timestamp>.md`.
 
-8. **Deliver the Report** - Confirm the report file was written successfully, provide a summary of findings to the user, indicate the Pass/Fail verdict clearly, suggest next steps if the review failed.
+8. **Deliver the Report** - If `mcp__adw__submit_review` is available, call it as your last action: `verdict` is FAIL if any blocker exists, else PASS; `report` is the full report; `blocker_count` is the number of blockers. Otherwise confirm the report file was written. Then give a short summary of findings, the Pass/Fail verdict, and next steps if the review failed.
 
 ## Report
 

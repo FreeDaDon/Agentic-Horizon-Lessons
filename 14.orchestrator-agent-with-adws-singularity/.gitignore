@@ -11,7 +11,6 @@ bun.lockb
 *.js
 !*.config.js
 !*.mjs
-tsconfig.json
 .tsbuildinfo
 
 # === UV / Python Virtual Environments ===
@@ -114,7 +113,6 @@ obj/
 .vercel/
 
 # === Package Managers ===
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
 

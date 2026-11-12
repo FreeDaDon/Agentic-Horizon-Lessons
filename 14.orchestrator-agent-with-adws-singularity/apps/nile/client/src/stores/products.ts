@@ -1,7 +1,7 @@
 // Products store
 import { defineStore } from 'pinia';
 import { ref } from 'vue';
-import type { Product, HomeSection } from '../types';
+import type { Product, HomeSection, Session } from '../types';
 import api from '../services/api';
 
 export const useProductsStore = defineStore('products', () => {
@@ -58,7 +58,7 @@ export const useProductsStore = defineStore('products', () => {
   }
 
   // NEW: WebSocket streaming - sections appear as they're generated
-  function fetchHomePageStreaming(userId: number): Promise<void> {
+  function fetchHomePageStreaming(session: Session): Promise<void> {
     return new Promise((resolve, reject) => {
       // Reset state
       homeSections.value = [];
@@ -72,9 +72,10 @@ export const useProductsStore = defineStore('products', () => {
       // Build WebSocket URL - handle both dev proxy and direct
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       const host = window.location.host;
-      const wsUrl = `${protocol}//${host}/ws/home/${userId}`;
+      // Browsers cannot set headers on a WebSocket, so the token rides in the query string
+      const wsUrl = `${protocol}//${host}/ws/home/${session.user.id}?token=${encodeURIComponent(session.token)}`;
 
-      console.log('[HomeStream] Connecting to:', wsUrl);
+      console.log('[HomeStream] Connecting to:', `${protocol}//${host}/ws/home/${session.user.id}`);
 
       ws = new WebSocket(wsUrl);
 
@@ -111,7 +112,7 @@ export const useProductsStore = defineStore('products', () => {
             streaming.value = false;
             loading.value = false;
             ws?.close();
-            reject(new Error(error.value));
+            reject(new Error(error.value ?? undefined));
           } else if (message.type === 'ping') {
             // Keep-alive, ignore
           }

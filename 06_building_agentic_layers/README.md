@@ -33,22 +33,28 @@ Stages 8 and 9 are new in lesson 14.
 
 ```
 adws/
-├── adw_modules/     adw_agent_sdk.py (typed SDK wrapper) · adw_database.py · adw_logging.py
-│                    adw_websockets.py · adw_summarizer.py (haiku one-line event summaries)
-├── adw_workflows/   adw_plan_build.py · adw_plan_build_review.py · adw_plan_build_review_fix.py
-└── adw_triggers/    adw_scripts.py (detached `uv run … --adw-id`) · adw_manual_trigger.py (CLI)
+├── adw_modules/     adw_steps.py (shared step runner: profiles, caps, submit tools, fix loop)
+│                    adw_agent_sdk.py (typed SDK wrapper, no bypass mode) · adw_database.py · adw_logging.py
+│                    adw_websockets.py · adw_summarizer.py (tool-less haiku event summaries)
+│                    adw_plan.py · adw_review.py (plan-path validation, fail-closed verdict fallback)
+├── adw_workflows/   adw_plan_build.py · adw_plan_build_review.py · adw_plan_build_review_fix.py (~20 lines each)
+├── adw_triggers/    adw_scripts.py (`uv run … --adw-id` in its own process group, log file, cancel)
+│                    adw_manual_trigger.py (CLI)
+└── adw_tests/       offline suite: recorded SDK streams, in-memory DB sink
 ```
 
 **Every step is a slash command with a fixed output location**, and that is what lets deterministic code chain them:
 
 | Step | Command | Output | Tools (least privilege) | Model |
 |---|---|---|---|---|
-| Plan | `/plan "<prompt>"` | `specs/<kebab-name>.md` | full set | default: opus |
-| Build | `/build <plan_path>` | code changes | full set | default: opus |
-| Review | `/review "<prompt>" <plan_path>` | `app_review/review_<ts>.md` with **PASS/FAIL** | no `Edit`: *"You are NOT building anything."* | opus |
-| Fix | `/fix "<prompt>" <plan> <review>` (**only on FAIL**) | `app_fix_reports/fix_<ts>.md` | no web tools | opus |
+| Plan | `/plan "<prompt>"` | `specs/<kebab-name>.md`, returned through `submit_plan(plan_path)` | `acceptEdits` | `model` (default opus) |
+| Build | `/build <plan_path>` | code changes | `acceptEdits` | `model` |
+| Review | `/review "<prompt>" <plan_path>` | `submit_review(verdict, report, blocker_count)`; Python writes `app_review/review_<adw8>_r<round>.md` | `dontAsk`, read-only tools and read-only git | `review_model` |
+| Fix | `/fix "<prompt>" <plan> <review>` (**only on FAIL**) | `app_fix_reports/fix_<ts>.md`, then re-review | `acceptEdits` | `fix_model` |
 
-**The ADW step lifecycle** (same for every step): create an agent row, log step start, set the ADW `current_step`, run `query_to_completion(prompt="/<step> …")` with logging hooks, write session/tokens/cost back, log step end. Details and copyable skeleton: [adw-layers.md](adw-layers.md).
+Default caps per step (override per ADW with `input_data.step_caps`): plan 40 turns / $3 / 30 min, build 80 / $8 / 60 min, review 40 / $3 / 30 min, fix 60 / $5 / 45 min. The run refuses to start a step whose cap would push total spend past `max_budget_usd` (default $20).
+
+**The ADW step lifecycle** (same for every step, owned by `adw_steps.py`): check the budget, create an agent row, log step start, set the ADW `current_step`, run the slash command under the step's permission profile and caps with logging hooks, collect the submit-tool result, write session/tokens/cost back, log step end. Any exception, including before the first step, marks the row failed. Details and copyable skeleton: [adw-layers.md](adw-layers.md).
 
 **The database is the contract.** The trigger passes **only `--adw-id`**. The workflow loads prompt, working directory and models from `ai_developer_workflows.input_data` and writes `status`, `current_step`, `completed_steps`, `duration_seconds`, `error_step` and `error_message` back.
 
@@ -62,12 +68,24 @@ adws/
 - **Fix report:** status ✅ ALL FIXED / ⚠️ PARTIAL / ❌ BLOCKED → fixes by tier with before and after → skipped issues → validation-command results → files changed.
 - Real example: [`review_2025-12-24T121500.md`](../14.orchestrator-agent-with-adws-singularity/app_review/review_2025-12-24T121500.md) flagged an XSS blocker (`v-html` without sanitizing). [`fix_2025-12-24T122000.md`](../14.orchestrator-agent-with-adws-singularity/app_fix_reports/fix_2025-12-24T122000.md) added DOMPurify and cut the bundle from 1,048 KB to 200 KB.
 
-## Hardening checklist before you trust an ADW unattended
+## Hardening checklist: gaps found in the lesson code, and their status
 
-These are real gaps found in the lesson code. Fix them before running ADWs against anything that matters.
+Every row below was a real gap in lesson 14. All are fixed in this repo and covered by the offline suite in `adws/adw_tests/` (run by CI). Use the table as the checklist for any ADW layer you build.
 
-| Gap in the lesson code | Harden to |
+| Gap in the original lesson code | Fix now in the code |
 |---|---|
+| Verdict parsed by substring from chat text | `/review` must call `submit_review(verdict, …)`; text parsing is a fail-closed fallback only |
+| Plan and review paths chosen as the newest file by mtime (races across concurrent ADWs) | `submit_plan(plan_path)` returns the exact path; it is validated and stored in `output_data` |
+| `bypass_permissions=True` accepted but never mapped to the SDK | Explicit `permission_mode` per step; the bypass mode is not representable in the type |
+| No `max_turns`, dollar or time cap | Per-step `max_turns`, `max_budget_usd`, wall-clock timeout; per-ADW budget checked before each step ([module 11](../11_cost_governance/README.md)) |
+| One fix pass, never re-reviewed; FAIL still reported `completed` | `review_until_pass` loops review ⇄ fix up to `max_fix_rounds`, then fails with an escalation message; `review_must_pass` fails the ADW on FAIL |
+| Detached process sent stdout/stderr to `/dev/null` | `agents/adw/<adw_id>/run.log`; pid and log path stored on the row; `cancel_adw` kills the process group |
+| Summarizer ran with `bypassPermissions` and no tool limit | Tool-less, one-turn summaries, at most 4 concurrent, drained before shutdown |
+| Dangerous-command hook blocked only `rm`; `.env` guard commented out | Shared detector blocks destructive git, dd, mkfs, chmod -R /, curl \| sh, terraform destroy, DROP; `.env` guard on ([tests](../tests/test_guard_hooks.py)) |
+| Hooks failed open: unquoted `$CLAUDE_PROJECT_DIR` in a folder name with a space, non-executable scripts | Quoted `uv run --script` commands; [`tests/test_hook_wiring.py`](../tests/test_hook_wiring.py) runs the real command strings |
+| Commands and hooks load only if the target `working_dir` has `.claude/` | Still true: sync the layer into targets with `scripts/copy_claude.py`, or run targets inside a [sandbox worktree](../09_sandboxing/README.md) of this repo |
+
+---|---|
 | Verdict parsed as `"PASS" in text and "FAIL" not in text`, so "no FAIL conditions" counts as FAIL | Have `/review` write a machine-readable line (`VERDICT: PASS`) or JSON; parse only that |
 | Plan and review paths chosen as the newest file by modification time, which races across concurrent ADWs | Have the step return the exact path in structured output; store it in `output_data` |
 | `bypass_permissions=True` is accepted but never mapped to the SDK's `permission_mode` | Set `permission_mode` explicitly per step; keep review read-only |

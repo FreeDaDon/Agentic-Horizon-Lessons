@@ -45,6 +45,7 @@ Create a new Agent with specified configuration.
   - `haiku` or `fast` → haiku (faster, lower cost)
   - Or pass full model name directly
 - **subagent_template**: Name of a subagent template to use (optional). If provided, the template's system prompt, tools, and model will be applied automatically. See "Available Subagent Templates" section above for available templates.
+- **tools**: List of tool names the agent may use, e.g. `["Read", "Grep", "Glob"]` (optional). Overrides the template's tools. Every other built-in tool is disallowed for the agent's whole life.
 
 If no name is provider, infer it based on the information in the user request.
 If there's nothing to infer, name it a short two word name with a dash in between related to tech, coding, llms, agents and ai.
@@ -124,15 +125,18 @@ Start an AI Developer Workflow. The workflow runs asynchronously and you receive
   - Example: "oauth-feature", "fix-login-bug", "refactor-auth"
 - **workflow_type**: Type of workflow to run (required)
   - Maps to `adws/adw_workflows/adw_<workflow_type>.py`
-  - Example: "feature-development", "bug-fix", "refactor"
+  - Must be one of the Available ADW Workflow Types above
 - **prompt**: The actual task/prompt for the ADW to execute (required)
 - **description**: Optional detailed description of what the ADW should accomplish
+- **model**, **review_model**, **fix_model**: Optional model aliases (opus, sonnet, haiku); default opus
+- **max_budget_usd**: Optional total budget for the whole ADW (default 20)
+- **max_fix_rounds**: Optional fix/re-review rounds for plan_build_review_fix (default 2)
 
 **Example:**
 ```
 start_adw(
   name_of_adw="oauth-feature",
-  workflow_type="feature-development",
+  workflow_type="plan_build_review_fix",
   prompt="Implement OAuth authentication with Google and GitHub providers",
   description="Add social login support to the application"
 )
@@ -159,6 +163,11 @@ check_adw(
   event_type="StepEnd"
 )
 ```
+
+#### cancel_adw
+Stop a running ADW (all of its processes) and mark it cancelled. Only when the user asks.
+
+- **adw_id**: The UUID of the ADW to cancel (required)
 
 #### When to Use ADWs vs Direct Agent Management
 

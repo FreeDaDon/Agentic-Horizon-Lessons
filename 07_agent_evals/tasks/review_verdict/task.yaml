@@ -1,0 +1,9 @@
+prompt: >-
+  You are the review step of an AI developer workflow. change.diff is a proposed change to
+  shipping.py. SPEC.md is the requirement it must keep meeting. Review the diff against the
+  spec. Do not apply it and do not edit any existing file. Write REVIEW.md with your findings.
+  Its last line must be exactly "VERDICT: PASS" or "VERDICT: FAIL".
+grader: ["{python}", "-m", "pytest", "-q", "-p", "no:cacheprovider", "--noconftest", "test_hidden_review.py"]
+timeout_s: 300
+max_turns: 10
+max_budget_usd: 0.5

@@ -1,0 +1,8 @@
+overview:
+  description: "Billing"
+core_implementation:
+  billing:
+    file: "src/payments.py"
+    lines: 400
+    calculate_tax:
+      lines: "50-80"

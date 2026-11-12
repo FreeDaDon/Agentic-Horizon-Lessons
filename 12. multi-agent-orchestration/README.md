@@ -378,7 +378,6 @@ multi-agent-orchestration/
 │   │   │   ├── 7_triggers.sql
 │   │   │   └── 8_orchestrator_chat.sql
 │   │   ├── run_migrations.py     # Apply migrations to database
-│   │   ├── sync_models.py        # Sync models to apps
 │   │   └── README.md             # Database documentation
 │   │
 │   └── orchestrator_3_stream/    # Web orchestrator application
@@ -579,8 +578,8 @@ uv run apps/orchestrator_db/run_migrations.py
 # 3. Update models if needed
 code apps/orchestrator_db/models.py
 
-# 4. Sync models to apps
-uv run apps/orchestrator_db/sync_models.py
+# 4. Copy models to the backend
+cp apps/orchestrator_db/models.py apps/orchestrator_3_stream/backend/modules/orch_database_models.py
 ```
 
 ### Adding New Features

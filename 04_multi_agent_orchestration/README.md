@@ -53,21 +53,26 @@ Details, lifecycle and code: [fleet-crud.md](fleet-crud.md).
 ## Design rules
 
 1. **The orchestrator dispatches; workers execute.** Keep the orchestrator's tool list to management tools plus light read tools.
-2. **Summaries, not transcripts, go back to the orchestrator.** A haiku summarizer turns every event into about 50–100 characters. That is the reduce/delegate split from [pillar 1](../01_elite_context_engineering/README.md), applied to a fleet.
+2. **Summaries, not transcripts, go back to the orchestrator.** The summarizer reads untrusted tool output, so it runs with no tools and one turn. A haiku summarizer turns every event into about 50–100 characters. That is the reduce/delegate split from [pillar 1](../01_elite_context_engineering/README.md), applied to a fleet.
 3. **Templates are reusable system prompts.** `.claude/agents/*.md` frontmatter (`name, description, tools, model`) plus the body as prompt.
 4. **Every worker is resumable.** Store `session_id`; each `command_agent` resumes.
 5. **Status is explicit.** `idle → executing → idle`, or `blocked` on error.
 6. **Compact workers deliberately.** `command_agent(name, "/compact")` at 80% context (a fleet-level exception to pillar 1's "prefer reset" rule, because workers keep long-running roles).
 
-## Known gaps in the lesson code (fix before relying on it)
+## Gaps found in the lesson code, and their status
 
-| Gap | Fix |
+All three orchestrator copies (lessons 12, 13, 14) carry these fixes. Each has an offline test under `apps/orchestrator_3_stream/backend/tests/`.
+
+| Gap | Status |
 |---|---|
-| Template **tool limits apply only at creation**. `command_agent` hardcodes the full default toolset, so a "read-only" scout gets Write/Edit/Bash once commanded | Store the template's `allowed_tools` on the agent row and apply it on every command |
-| `/orch_plan_w_scouts_build_review` asks for a per-agent tool list `create_agent` can't accept | Add a `tools` parameter to `create_agent` |
-| Statuses `waiting`/`complete` and agent-side chat rows exist in the schema but are never written | Remove them or implement them |
-| `PreCompact` resets tokens **and cost**, so spend history is lost | Reset tokens only; keep cost cumulative |
-| Context % is estimated from cumulative tokens / 200K | Read real usage per turn; treat the estimate as a warning only |
+| Template tool limits applied only at creation; `command_agent` handed every worker the full default toolset | **Fixed.** `create_agent` stores the template's (or an explicit `tools`) policy in `agents.metadata`, and every command reapplies it (`test_agent_tool_policy.py`) |
+| `create_agent` had no way to set a tool list | **Fixed.** Optional `tools` parameter on the method and the MCP tool |
+| The event summarizer ran `bypassPermissions` with no tool limit while reading tool output (a prompt-injection path) | **Fixed.** `modules/tool_policy.py` gives summarizer and autocomplete agents no tools and one turn ([module 10](../10_prompt_injection_defense/README.md)) |
+| `delete_agent` left a running worker running | **Fixed.** It interrupts the active client first |
+| `/ws` accepted any Origin; `/api/open-file` opened any path; `/send_chat` trusted a client-sent orchestrator id | **Fixed.** `modules/request_guards.py` (`test_request_guards.py`) |
+| `PreCompact` reset cost along with tokens | **Fixed.** Cost stays cumulative |
+| Statuses `waiting`/`complete` and agent-side chat rows exist in the schema but are never written | Open. Harmless; remove or implement when you extend the schema |
+| Context % is estimated from cumulative tokens / 200K | Open. Treat it as a warning only |
 
 ## Domain adaptation
 

@@ -196,6 +196,6 @@ agents/
 
 app_docs/
 
-apps/custom_4_social_hype/*.csv
+apps/custom_4_social_hype_agent/*.csv
 
 .playwright*/

@@ -12,7 +12,6 @@ from rich.panel import Panel
 from rich.syntax import Syntax
 from rich.table import Table
 from rich.text import Text
-import json as json_module
 from .config import PLAN_DIRECTORY, REVIEW_DIRECTORY
 
 from claude_agent_sdk import (
@@ -52,10 +51,57 @@ def load_prompt(prompt_path: str, variables: Dict[str, str]) -> str:
 def is_inside_directory(file_path: str, directory: str, working_dir: str) -> bool:
     """True if file_path, resolved from the agent's working directory, lies inside directory.
 
-    Resolving follows `..` and symlinks, so `specs/../main.py`, `specs_evil/x.md` and a
-    symlink out of specs/ are all outside. `directory` must already be resolved.
+    Resolving follows `~`, `..` and symlinks, so `specs/../main.py`, `specs_evil/x.md`,
+    `~/.bashrc` and a symlink out of specs/ are all outside. `directory` must already be
+    resolved.
     """
-    return Path(working_dir, file_path).resolve().is_relative_to(directory)
+    return Path(working_dir, Path(file_path).expanduser()).resolve().is_relative_to(directory)
+
+
+# The input field each file-writing tool names its target in.
+WRITE_TOOL_PATH_FIELDS = {
+    "Write": "file_path",
+    "Edit": "file_path",
+    "MultiEdit": "file_path",
+    "NotebookEdit": "notebook_path",
+}
+
+
+def confine_writes(agent_name: str, allowed_directory: str, working_dir: str):
+    """PreToolUse hook that denies file-writing tools targeting a path outside allowed_directory.
+
+    `allowed_directory` must already be resolved; other tools pass through untouched.
+    """
+
+    async def hook(
+        input_data: Dict[str, Any], tool_use_id: str | None, context: HookContext
+    ) -> Dict[str, Any]:
+        tool_name = input_data.get("tool_name", "")
+        path_field = WRITE_TOOL_PATH_FIELDS.get(tool_name)
+        if path_field is None:
+            return {}
+
+        file_path = input_data.get("tool_input", {}).get(path_field, "")
+        if is_inside_directory(file_path, allowed_directory, working_dir):
+            return {}
+
+        console.print(
+            Panel(
+                f"{tool_name} blocked: {file_path}\n"
+                f"{agent_name} can only write to {allowed_directory}",
+                title="❌ Permission Denied",
+                border_style="red",
+            )
+        )
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "permissionDecision": "deny",
+                "permissionDecisionReason": f"{agent_name} can only write to {allowed_directory}",
+            }
+        }
+
+    return hook
 
 
 def get_message_emoji(message_type: str) -> str:
@@ -260,78 +306,11 @@ async def run_planner_agent(
         {"USER_PROMPT": user_prompt, "PLAN_OUTPUT_DIRECTORY": full_plan_directory},
     )
 
-    # Configure hooks for Write tool restrictions (works for subagents too!)
-    async def planner_write_hook(
-        input_data: Dict[str, Any], tool_use_id: str | None, context: HookContext
-    ) -> Dict[str, Any]:
-        """Hook to control Write tool access for planner and its subagents"""
-        tool_name = input_data.get("tool_name", "")
-        tool_input = input_data.get("tool_input", {})
-
-        # Log tool interception in a panel
-        hook_info = f"Tool: {tool_name}\nInput preview: {json_module.dumps(tool_input, indent=2)[:200]}"
-        console.print(
-            Panel(
-                hook_info, title="🔧 Hook Intercepted", border_style="cyan", style="dim"
-            )
-        )
-
-        if tool_name == "Write":
-            file_path = tool_input.get("file_path", "")
-            content = tool_input.get("content", "")[:100]  # First 100 chars
-
-            write_info = Table(show_header=False, box=None, padding=(0, 1))
-            write_info.add_column("Field", style="yellow", no_wrap=True)
-            write_info.add_column("Value", style="white")
-            write_info.add_row("Path:", file_path)
-            write_info.add_row("Content preview:", f"{content}...")
-            write_info.add_row("Working dir:", str(working_dir))
-            write_info.add_row("Full plan dir:", str(full_plan_directory))
-
-            console.print(
-                Panel(write_info, title="📝 Write Request", border_style="yellow")
-            )
-
-            # Check if file is in the plan directory
-            if not is_inside_directory(file_path, full_plan_directory, working_dir):
-                console.print(
-                    Panel(
-                        f"Write blocked: Planner can only write to {full_plan_directory}",
-                        title="❌ Permission Denied",
-                        border_style="red",
-                    )
-                )
-                return {
-                    "hookSpecificOutput": {
-                        "hookEventName": "PreToolUse",
-                        "permissionDecision": "deny",
-                        "permissionDecisionReason": f"Planner can only write to {full_plan_directory}",
-                    }
-                }
-
-            console.print(
-                Panel(
-                    f"Allowing write to plan directory: {file_path}",
-                    title="✅ Write Allowed",
-                    border_style="green",
-                    style="dim",
-                )
-            )
-
-        # Allow all other tools
-        console.print(
-            Panel(
-                f"Tool: {tool_name}",
-                title="✅ Tool Allowed",
-                border_style="green",
-                style="dim",
-            )
-        )
-        return {}  # Empty dict = allow
-
-    # Configure hooks
+    # PreToolUse hooks also run for subagents the planner spawns.
     hooks = {
-        "PreToolUse": [HookMatcher(hooks=[planner_write_hook])]  # Applies to all tools
+        "PreToolUse": [
+            HookMatcher(hooks=[confine_writes("Planner", full_plan_directory, working_dir)])
+        ]
     }
 
     # Configure system prompt to use Claude Code's default + append custom instructions
@@ -461,12 +440,17 @@ async def run_builder_agent(
         "preset": "claude_code",
     }
 
-    # Configure options with session resumption for BUILDER (no write restrictions)
+    codebase_dir = str(Path(working_dir).resolve())
+    hooks = {
+        "PreToolUse": [HookMatcher(hooks=[confine_writes("Builder", codebase_dir, working_dir)])]
+    }
+
     options = ClaudeAgentOptions(
         system_prompt=builder_system_prompt,
         model=model,
         cwd=working_dir,  # Use ticket's codebase path
-        permission_mode="bypassPermissions",
+        hooks=hooks,
+        permission_mode="acceptEdits",
         resume=resume_session_id,  # Reuse session if provided
     )
 
@@ -578,55 +562,10 @@ async def run_reviewer_agent(
         },
     )
 
-    # Configure hooks for Write tool restrictions (works for subagents too!)
-    async def reviewer_write_hook(
-        input_data: Dict[str, Any], tool_use_id: str | None, context: HookContext
-    ) -> Dict[str, Any]:
-        """Hook to control Write tool access for reviewer and its subagents"""
-        tool_name = input_data.get("tool_name", "")
-        tool_input = input_data.get("tool_input", {})
-
-        if tool_name == "Write":
-            file_path = tool_input.get("file_path", "")
-            console.print(
-                Panel(
-                    f"Attempting to write to: {file_path}",
-                    title="📝 Reviewer Write Request",
-                    border_style="dim",
-                )
-            )
-
-            # Check if file is in the full review directory
-            if not is_inside_directory(file_path, full_review_directory, working_dir):
-                console.print(
-                    Panel(
-                        f"Write blocked: Reviewer can only write to {full_review_directory}\nAttempted path: {file_path}",
-                        title="❌ Permission Denied",
-                        border_style="red",
-                    )
-                )
-                return {
-                    "hookSpecificOutput": {
-                        "hookEventName": "PreToolUse",
-                        "permissionDecision": "deny",
-                        "permissionDecisionReason": f"Reviewer can only write to {full_review_directory}",
-                    }
-                }
-
-            console.print(
-                Panel(
-                    f"Write allowed to review directory: {file_path}",
-                    title="✅ Write Allowed",
-                    border_style="green",
-                    style="dim",
-                )
-            )
-
-        return {}  # Empty dict = allow
-
-    # Configure hooks
     hooks = {
-        "PreToolUse": [HookMatcher(hooks=[reviewer_write_hook])]  # Applies to all tools
+        "PreToolUse": [
+            HookMatcher(hooks=[confine_writes("Reviewer", full_review_directory, working_dir)])
+        ]
     }
 
     # Configure system prompt to use Claude Code's default + append custom instructions

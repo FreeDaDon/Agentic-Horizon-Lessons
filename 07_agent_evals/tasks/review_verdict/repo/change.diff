@@ -1,0 +1,15 @@
+diff --git a/shipping.py b/shipping.py
+index 128d114..25a170d 100644
+--- a/shipping.py
++++ b/shipping.py
+@@ -3,8 +3,5 @@ FLAT_FEE = 5.00
+ 
+ 
+ def shipping_cost(total):
+-    if total < 0:
+-        raise ValueError("order total cannot be negative")
+-    if total >= FREE_SHIPPING_THRESHOLD:
+-        return 0.0
+-    return FLAT_FEE
++    # Simplify: one expression, no branches.
++    return 0.0 if total > FREE_SHIPPING_THRESHOLD else FLAT_FEE

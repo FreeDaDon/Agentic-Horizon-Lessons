@@ -2,7 +2,7 @@
 
 > **BLUF:** *"Better agents, more agents, then… custom agents."* The Agent SDK turns Claude Code's loop into a library. You pick the **system prompt** (replace or append), the **tools** (custom in-process tools, with built-ins denied), the **state** (`resume` a session), and the **guardrails** (inline hooks that also cover sub-agents). Lesson 11 builds this up over 8 agents, from a one-line "pong" bot to two cooperating streaming agents behind a web UI.
 
-**Source:** code in [`11. building-specialized-agents/`](../11.%20building-specialized-agents/README.md). There is no transcript; this pillar is derived from the code ([summary](../transcripts_summary/11_building_specialized_agents_code_derived.md)). Package: `claude-agent-sdk` (Python). The TypeScript pong agent uses the older `@anthropic-ai/claude-code` package; its successor is `@anthropic-ai/claude-agent-sdk`.
+**Source:** code in [`11. building-specialized-agents/`](../11.%20building-specialized-agents/README.md). There is no transcript; this pillar is derived from the code ([summary](../transcripts_summary/11_building_specialized_agents_code_derived.md)). Packages: `claude-agent-sdk` (Python, locked at 0.2.163) and `@anthropic-ai/claude-agent-sdk` (TypeScript, used by the pong agent and lesson 9's wrapper and hello scripts). The older `@anthropic-ai/claude-code` SDK import is gone from the repo.
 
 ---
 

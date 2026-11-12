@@ -1,11 +1,11 @@
 """Cart router."""
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from typing import Optional
 
 from ..database import get_db
+from ..sessions import current_user_id
 from ..models import CartItem, Product, User
 from ..schemas import CartItemCreate, CartItemUpdate, CartResponse, CartItemResponse
 from .expertise import track_action_internal, remove_from_cart_internal
@@ -13,19 +13,9 @@ from .expertise import track_action_internal, remove_from_cart_internal
 router = APIRouter(prefix="/cart", tags=["cart"])
 
 
-async def get_current_user_id(x_user_id: Optional[str] = Header(None)) -> int:
-    """Extract user ID from header."""
-    if not x_user_id:
-        raise HTTPException(status_code=401, detail="User ID required in X-User-Id header")
-    try:
-        return int(x_user_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
-
-
 @router.get("", response_model=CartResponse)
 async def get_cart(
-    user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get user's cart."""
@@ -57,7 +47,7 @@ async def get_cart(
 @router.post("/add", response_model=CartItemResponse)
 async def add_to_cart(
     item_data: CartItemCreate,
-    user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Add item to cart (also tracks add_to_cart action)."""
@@ -111,7 +101,7 @@ async def add_to_cart(
 async def update_cart_item(
     item_id: int,
     item_data: CartItemUpdate,
-    user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Update cart item quantity."""
@@ -148,7 +138,7 @@ async def update_cart_item(
 @router.delete("/{item_id}")
 async def remove_from_cart(
     item_id: int,
-    user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Remove item from cart (also removes from expertise tracking)."""

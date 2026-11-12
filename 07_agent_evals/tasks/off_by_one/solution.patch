@@ -1,0 +1,10 @@
+diff --git a/pager.py b/pager.py
+index a89fa06..7548994 100644
+--- a/pager.py
++++ b/pager.py
+@@ -1,4 +1,4 @@
+ def page(items, page_number, page_size):
+     """Return the items on a 1-indexed page."""
+-    start = page_number * page_size
++    start = (page_number - 1) * page_size
+     return items[start:start + page_size]

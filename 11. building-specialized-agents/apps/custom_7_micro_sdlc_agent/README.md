@@ -59,10 +59,6 @@ apps/custom_7_micro_sdlc_agent/
 ```bash
 cd apps/custom_7_micro_sdlc_agent/backend
 uv sync
-
-# Important: WebSocket support requires uvicorn[standard]
-# If you see WebSocket errors, run:
-uv pip install 'uvicorn[standard]' websockets
 ```
 
 ### Frontend Setup
@@ -91,6 +87,8 @@ npm run dev
 ```
 
 Open your browser to `http://127.0.0.1:5174`
+
+The backend rejects browser requests and WebSocket connections from any other origin, so other web pages cannot drive the agents. To serve the frontend from somewhere else, set `MICRO_SDLC_ALLOWED_ORIGINS` to a comma-separated list of origins before starting the backend.
 
 ## Workflow Stages
 

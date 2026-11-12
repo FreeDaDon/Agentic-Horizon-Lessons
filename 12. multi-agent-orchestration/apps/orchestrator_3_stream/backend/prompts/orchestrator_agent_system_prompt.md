@@ -35,6 +35,7 @@ Create a new Agent with specified configuration.
   - `haiku` or `fast` → haiku (faster, lower cost)
   - Or pass full model name directly
 - **subagent_template**: Name of a subagent template to use (optional). If provided, the template's system prompt, tools, and model will be applied automatically. See "Available Subagent Templates" section above for available templates.
+- **tools**: List of tool names the agent may use, e.g. `["Read", "Grep", "Glob"]` (optional). Overrides the template's tools. Every other built-in tool is disallowed for the agent's whole life.
 
 If no name is provider, infer it based on the information in the user request.
 If there's nothing to infer, name it a short two word name with a dash in between related to tech, coding, llms, agents and ai.

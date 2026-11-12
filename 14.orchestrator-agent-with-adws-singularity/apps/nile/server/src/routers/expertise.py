@@ -1,12 +1,13 @@
 """Expertise router for Agent Expert learning."""
 from datetime import datetime
 from typing import Optional, Literal
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from ..database import get_db
+from ..sessions import current_user_id
 from ..models import Expertise
 from ..schemas import ExpertiseResponse, ActionRequest, ExpertiseData
 from ..services.agent_expert import ShoppingAgentExpert
@@ -32,16 +33,6 @@ def _get_agent_expert() -> ShoppingAgentExpert:
     return _agent_expert
 
 router = APIRouter(prefix="/expertise", tags=["expertise"])
-
-
-async def get_current_user_id(x_user_id: Optional[str] = Header(None)) -> int:
-    """Extract user ID from header."""
-    if not x_user_id:
-        raise HTTPException(status_code=401, detail="User ID required in X-User-Id header")
-    try:
-        return int(x_user_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
 
 
 async def get_or_create_expertise(db: AsyncSession, user_id: int) -> Expertise:
@@ -160,7 +151,7 @@ async def remove_from_cart_internal(
 
 @router.get("", response_model=ExpertiseResponse)
 async def get_expertise(
-    user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get current user's expertise data."""
@@ -178,7 +169,7 @@ async def get_expertise(
 @router.post("/action")
 async def track_action(
     action_data: ActionRequest,
-    user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Track a user action (view, cart, checkout)."""
@@ -196,7 +187,7 @@ async def track_action(
 
 @router.delete("")
 async def clear_expertise(
-    user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Clear user's expertise data (Cmd+C functionality)."""
@@ -224,7 +215,7 @@ async def clear_expertise(
 
 @router.get("/live-prompt", response_model=LiveSystemPromptResponse)
 async def get_live_system_prompt(
-    user_id: int = Depends(get_current_user_id),
+    user_id: int = Depends(current_user_id),
     db: AsyncSession = Depends(get_db)
 ):
     """Get the live, populated system prompt as it would be sent to the agent.

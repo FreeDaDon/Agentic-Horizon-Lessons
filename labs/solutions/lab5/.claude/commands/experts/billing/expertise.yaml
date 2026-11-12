@@ -1,0 +1,22 @@
+overview:
+  description: "Invoice totals and discounts, in integer cents"
+  invariants:
+    - "Money is always integer cents, never floats"
+    - "Discount percent is validated to 0-100"
+
+core_implementation:
+  billing:
+    file: "src/billing.py"
+    lines: 17
+    Invoice:
+      lines: "4-7"
+      purpose: "Immutable invoice record"
+    total_cents:
+      lines: "10-11"
+      purpose: "Sum of invoice amounts"
+    apply_discount:
+      lines: "14-17"
+      purpose: "Integer discount, rounds down, rejects percent outside 0-100"
+
+known_issues:
+  - "No currency field: every invoice is assumed to be USD"

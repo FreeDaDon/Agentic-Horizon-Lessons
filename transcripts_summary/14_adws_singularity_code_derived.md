@@ -14,8 +14,5 @@ ADWs are *"the highest leverage point of agentic coding: deterministic orchestra
 - `/review` (opus, no Edit) → `app_review/`; `/fix` (opus) → `app_fix_reports/`.
 - `experts/adw/` (expertise, self-improve, plan_build_improve); `AdwSwimlanes.vue` UI; `scripts/copy_claude.py`.
 
-## Caveats found in the code
-- Verdict parsing by substring; plan and review paths chosen by newest modification time.
-- `bypass_permissions` is never mapped to the SDK; no `max_turns` or budget on steps.
-- A single fix pass with no re-review; stdout and stderr go to `/dev/null`; `adw_agents.py` is empty.
-- A fix report exists for a review whose verdict was PASS (either a false FAIL parse or a manual run).
+## Caveats found in the code (all fixed in this repo)
+The original lesson code parsed verdicts by substring, picked plan and review paths by newest modification time, never mapped `bypass_permissions` to the SDK, had no turn or budget caps, ran one fix pass with no re-review, sent the runner's output to `/dev/null`, and left `adw_agents.py` empty. A fix report even exists for a review whose verdict was PASS. Each of these is now fixed and tested; the [pillar 6 checklist](../06_building_agentic_layers/README.md#hardening-checklist-gaps-found-in-the-lesson-code-and-their-status) maps each gap to its fix.

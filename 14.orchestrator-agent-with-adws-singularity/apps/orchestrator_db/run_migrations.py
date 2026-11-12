@@ -21,7 +21,7 @@ Features:
     - Idempotent - safe to run multiple times
     - Preserves existing data
     - Rich terminal output with progress tracking
-    - Loads DATABASE_URL from .env file
+    - Reads DATABASE_URL from the environment, or from the project root .env file
 
 Requirements:
     - psql command-line tool installed
@@ -38,6 +38,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 from rich.table import Table
+
+from psql_cli import psql_invocation
 
 console = Console()
 
@@ -67,11 +69,7 @@ def main():
     env_file = project_root / ".env"
     migrations_dir = script_dir / "migrations"
 
-    if not env_file.exists():
-        console.print(f"[red]✗ Error:[/red] .env file not found at {env_file}", style="bold")
-        console.print("Create a .env file with DATABASE_URL='your-neon-connection-string'")
-        sys.exit(1)
-
+    # A DATABASE_URL already in the environment wins; the .env file is optional.
     load_dotenv(env_file)
 
     # Check if DATABASE_URL is set
@@ -117,11 +115,8 @@ def main():
 
             task = progress.add_task(f"Running {migration_file}...", total=None)
 
-            result = subprocess.run(
-                ["psql", database_url, "-f", str(migration_path)],
-                capture_output=True,
-                text=True
-            )
+            argv, env = psql_invocation(database_url, "-f", str(migration_path))
+            result = subprocess.run(argv, env=env, capture_output=True, text=True)
 
             progress.remove_task(task)
 

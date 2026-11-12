@@ -48,6 +48,7 @@ from .database import (
     create_adw,
     get_adw,
     get_adw_logs,
+    update_adw_status,
 )
 from .single_agent_prompt import summarize_event
 from .command_agent_hooks import (
@@ -64,18 +65,9 @@ from .logger import OrchestratorLogger
 from . import config
 from .file_tracker import FileTracker
 from .subagent_loader import SubagentRegistry
+from .tool_policy import command_tool_policy, stored_tool_policy
 
-# ADW runner - import at runtime to avoid circular imports
-def _get_adw_runner():
-    """Lazy import of ADW runner to avoid import issues at module load."""
-    import sys
-    from pathlib import Path
-    # Add adws directory to path if not already there
-    adws_path = Path(__file__).parent.parent.parent.parent.parent / "adws"
-    if str(adws_path) not in sys.path:
-        sys.path.insert(0, str(adws_path))
-    from adw_triggers.adw_scripts import run_adw_workflow_async
-    return run_adw_workflow_async
+from . import adw_bridge
 
 
 class AgentManager:
@@ -122,37 +114,21 @@ class AgentManager:
         )
 
     def _get_available_workflow_types(self) -> List[str]:
-        """
-        Discover available ADW workflow types from adws/adw_workflows/*.py files.
-
-        Returns:
-            List of workflow type names (e.g., ['feature-development', 'bug-fix'])
-        """
-        workflow_dir = Path(self.working_dir) / "adws" / "adw_workflows"
-        if not workflow_dir.exists():
-            return []
-
-        types = []
-        for file in workflow_dir.glob("adw_*.py"):
-            # Extract type from filename: adw_feature-development.py -> feature-development
-            name = file.stem  # adw_feature-development
-            if name.startswith("adw_"):
-                workflow_type = name[4:]  # Remove "adw_" prefix
-                types.append(workflow_type)
-
-        return sorted(types)
+        """ADW workflow types the runner can start (adws/ resolved by the runner, not working_dir)."""
+        return list(adw_bridge.discover_workflows())
 
     def create_management_tools(self) -> List:
         """
-        Create 10 management tools for orchestrator.
+        Create 11 management tools for orchestrator.
 
         Agent Management Tools (8):
             - create_agent, list_agents, command_agent, check_agent_status
             - delete_agent, interrupt_agent, read_system_logs, report_cost
 
-        ADW Tools (2):
+        ADW Tools (3):
             - start_adw: Start an AI Developer Workflow
             - check_adw: Check ADW status and recent activity
+            - cancel_adw: Stop a running ADW and mark it cancelled
 
         Returns:
             List of tool callables decorated with @tool
@@ -160,8 +136,18 @@ class AgentManager:
 
         @tool(
             "create_agent",
-            "Create a new agent. REQUIRED: name. OPTIONAL: system_prompt (can be empty if using template), model, subagent_template. Use 'fast' for haiku model. If subagent_template is provided, the template's system prompt, tools, and model will be applied automatically.",
-            {"name": str, "system_prompt": str, "model": str, "subagent_template": str},
+            "Create a new agent. REQUIRED: name. OPTIONAL: system_prompt (can be empty if using template), model, subagent_template, tools. Use 'fast' for haiku model. If subagent_template is provided, the template's system prompt, tools, and model will be applied automatically. tools (list of tool names, e.g. [\"Read\", \"Grep\"]) limits the agent to exactly those tools and overrides the template's tools.",
+            {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "system_prompt": {"type": "string"},
+                    "model": {"type": "string"},
+                    "subagent_template": {"type": "string"},
+                    "tools": {"type": "array", "items": {"type": "string"}},
+                },
+                "required": ["name"],
+            },
         )
         async def create_agent_tool(args: Dict[str, Any]) -> Dict[str, Any]:
             """Tool for creating new agents"""
@@ -170,6 +156,7 @@ class AgentManager:
                 system_prompt = args.get("system_prompt", "")
                 model_input = args.get("model", config.DEFAULT_AGENT_MODEL)
                 subagent_template = args.get("subagent_template")
+                tools = args.get("tools")
 
                 # Model alias mapping
                 model_aliases = {
@@ -210,7 +197,9 @@ class AgentManager:
                         "is_error": True,
                     }
 
-                result = await self.create_agent(name, system_prompt, model, subagent_template)
+                result = await self.create_agent(
+                    name, system_prompt, model, subagent_template, tools=tools
+                )
 
                 if result["ok"]:
                     return {
@@ -443,6 +432,10 @@ class AgentManager:
                         "is_error": True,
                     }
 
+                # Stop a running command before archiving, so it does not keep
+                # working (and spending) as an agent nobody can see.
+                await self._interrupt_active_client(agent.name)
+
                 # Use Pydantic model properties
                 await delete_agent(agent.id)
 
@@ -487,14 +480,7 @@ class AgentManager:
                         "is_error": True,
                     }
 
-                with self.active_clients_lock:
-                    client = self.active_clients.get(agent_name)
-
-                if client:
-                    await client.interrupt()
-                    with self.active_clients_lock:
-                        del self.active_clients[agent_name]
-
+                if await self._interrupt_active_client(agent_name):
                     return {
                         "content": [
                             {
@@ -636,8 +622,24 @@ class AgentManager:
 
         @tool(
             "start_adw",
-            "Start an AI Developer Workflow. REQUIRED: name_of_adw, workflow_type, prompt. OPTIONAL: description. The workflow runs asynchronously - use check_adw to monitor progress. Returns adw_id for tracking.",
-            {"name_of_adw": str, "workflow_type": str, "prompt": str, "description": str},
+            "Start an AI Developer Workflow. REQUIRED: name_of_adw, workflow_type, prompt. OPTIONAL: description, "
+            "model (plan/build), review_model, fix_model (aliases: opus, sonnet, haiku), max_budget_usd (default 20), "
+            "max_fix_rounds (default 2). Runs asynchronously - use check_adw to monitor and cancel_adw to stop. Returns adw_id.",
+            {
+                "type": "object",
+                "properties": {
+                    "name_of_adw": {"type": "string"},
+                    "workflow_type": {"type": "string"},
+                    "prompt": {"type": "string"},
+                    "description": {"type": "string"},
+                    "model": {"type": "string"},
+                    "review_model": {"type": "string"},
+                    "fix_model": {"type": "string"},
+                    "max_budget_usd": {"type": "number", "exclusiveMinimum": 0},
+                    "max_fix_rounds": {"type": "integer", "minimum": 0},
+                },
+                "required": ["name_of_adw", "workflow_type", "prompt"],
+            },
         )
         async def start_adw_tool(args: Dict[str, Any]) -> Dict[str, Any]:
             """Tool for starting AI Developer Workflows"""
@@ -645,54 +647,34 @@ class AgentManager:
                 name_of_adw = args.get("name_of_adw")
                 workflow_type = args.get("workflow_type")
                 prompt = args.get("prompt")
-                description = args.get("description")
-
-                # Validate required fields
-                if not name_of_adw:
+                if not (name_of_adw and workflow_type and prompt):
                     return {
-                        "content": [{"type": "text", "text": "❌ Error: 'name_of_adw' is required"}],
-                        "is_error": True,
-                    }
-                if not workflow_type:
-                    return {
-                        "content": [{"type": "text", "text": "❌ Error: 'workflow_type' is required"}],
-                        "is_error": True,
-                    }
-                if not prompt:
-                    return {
-                        "content": [{"type": "text", "text": "❌ Error: 'prompt' is required"}],
+                        "content": [{"type": "text", "text": "❌ Error: name_of_adw, workflow_type and prompt are required"}],
                         "is_error": True,
                     }
 
-                # Validate workflow_type exists
-                workflow_file = Path(self.working_dir) / "adws" / "adw_workflows" / f"adw_{workflow_type}.py"
-                if not workflow_file.exists():
-                    available = self._get_available_workflow_types()
-                    return {
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": f"❌ Error: Workflow type '{workflow_type}' not found.\n"
-                                        f"Available types: {', '.join(available) if available else 'None'}\n"
-                                        f"Expected file: adws/adw_workflows/adw_{workflow_type}.py",
-                            }
-                        ],
-                        "is_error": True,
-                    }
+                try:
+                    workflow = adw_bridge.require_workflow(workflow_type)
+                except adw_bridge.UnknownWorkflowError as e:
+                    return {"content": [{"type": "text", "text": f"❌ Error: {e}"}], "is_error": True}
 
-                # Create ADW record in database (stores prompt + working_dir in input_data)
+                options = {
+                    key: args[key]
+                    for key in ("model", "review_model", "fix_model", "max_budget_usd", "max_fix_rounds")
+                    if args.get(key) is not None
+                }
                 adw_record = await create_adw(
                     orchestrator_agent_id=self.orchestrator_agent_id,
                     adw_name=name_of_adw,
-                    workflow_type=workflow_type,
+                    workflow_type=workflow.workflow_type,
                     prompt=prompt,
                     working_dir=self.working_dir,
-                    description=description,
+                    description=args.get("description"),
+                    total_steps=workflow.total_steps,
+                    options=options,
                 )
-
                 adw_id = str(adw_record["id"])
 
-                # Log and broadcast
                 self.logger.info(f"🚀 Started ADW '{name_of_adw}' (type: {workflow_type}) with ID: {adw_id}")
                 await self.ws_manager.broadcast({
                     "type": "adw_started",
@@ -704,30 +686,25 @@ class AgentManager:
                     }
                 })
 
-                # Trigger the workflow execution in background
-                # Note: working_dir is already stored in DB via create_adw above
-                run_adw = _get_adw_runner()
-                runner_result = await run_adw(
-                    adw_id=adw_id,
-                    workflow_type=workflow_type,
-                )
-
-                if runner_result.get("status") == "error":
-                    self.logger.error(f"ADW runner error: {runner_result.get('error')}")
+                try:
+                    handle = adw_bridge.start_workflow(adw_id, workflow.workflow_type)
+                except Exception as e:
+                    self.logger.error(f"ADW runner error: {e}", exc_info=True)
+                    await update_adw_status(adw_record["id"], "failed", error_message=f"Could not start workflow: {e}")
                     return {
-                        "content": [{"type": "text", "text": f"❌ Failed to start workflow: {runner_result.get('error')}"}],
+                        "content": [{"type": "text", "text": f"❌ Failed to start workflow: {e}"}],
                         "is_error": True,
                     }
-
-                pid = runner_result.get("pid", "unknown")
-                self.logger.info(f"ADW workflow started with PID: {pid}")
+                await adw_bridge.record_run(adw_id, handle)
+                self.logger.info(f"ADW workflow started with PID {handle.pid}, log {handle.log_path}")
 
                 lines = [
                     f"✅ Started AI Developer Workflow\n\n",
                     f"ADW ID: {adw_id}\n",
                     f"Name: {name_of_adw}\n",
-                    f"Type: {workflow_type}\n",
-                    f"Status: running (PID: {pid})\n\n",
+                    f"Type: {workflow_type} ({workflow.total_steps} steps)\n",
+                    f"Status: running (PID: {handle.pid})\n",
+                    f"Log: {handle.log_path}\n\n",
                     f"Use check_adw(adw_id=\"{adw_id}\") to monitor progress.\n",
                     f"⚠️  Note: Do NOT interfere with the ADW unless explicitly asked.",
                 ]
@@ -837,6 +814,32 @@ class AgentManager:
                     "is_error": True,
                 }
 
+        @tool(
+            "cancel_adw",
+            "Stop a running AI Developer Workflow (its whole process tree) and mark it cancelled. REQUIRED: adw_id.",
+            {"adw_id": str},
+        )
+        async def cancel_adw_tool(args: Dict[str, Any]) -> Dict[str, Any]:
+            """Tool for cancelling AI Developer Workflows"""
+            try:
+                result = await adw_bridge.cancel_adw(args.get("adw_id") or "")
+            except ValueError:
+                return {
+                    "content": [{"type": "text", "text": f"❌ Error: Invalid adw_id format: {args.get('adw_id')}"}],
+                    "is_error": True,
+                }
+            except Exception as e:
+                self.logger.error(f"cancel_adw tool error: {e}", exc_info=True)
+                return {"content": [{"type": "text", "text": f"❌ Error: {str(e)}"}], "is_error": True}
+
+            if result.cancelled:
+                self.logger.info(result.message)
+                await self.ws_manager.broadcast_adw_updated(args["adw_id"], {"status": "cancelled"})
+            return {
+                "content": [{"type": "text", "text": ("🚫 " if result.cancelled else "ℹ️  ") + result.message}],
+                "is_error": not result.cancelled,
+            }
+
         return [
             create_agent_tool,
             list_agents_tool,
@@ -848,10 +851,25 @@ class AgentManager:
             report_cost_tool,
             start_adw_tool,
             check_adw_tool,
+            cancel_adw_tool,
         ]
 
+    async def _interrupt_active_client(self, agent_name: str) -> bool:
+        """Interrupt the agent's running command, if any, and forget its client."""
+        with self.active_clients_lock:
+            client = self.active_clients.pop(agent_name, None)
+        if client is None:
+            return False
+        await client.interrupt()
+        return True
+
     async def create_agent(
-        self, name: str, system_prompt: str, model: Optional[str] = None, subagent_template: Optional[str] = None
+        self,
+        name: str,
+        system_prompt: str,
+        model: Optional[str] = None,
+        subagent_template: Optional[str] = None,
+        tools: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """
         Create a new agent.
@@ -861,6 +879,9 @@ class AgentManager:
             system_prompt: Agent's system prompt (can be empty if using template)
             model: Optional model override
             subagent_template: Optional template name to use
+            tools: Optional tool allowlist; overrides the template's tools.
+                Stored on the agent with every other built-in disallowed and
+                applied to every command.
 
         Returns:
             Dict with ok, agent_id, session_id, or error
@@ -906,6 +927,10 @@ class AgentManager:
                     self.logger.info(f"Applying template '{template.frontmatter.name}': {tool_count} tools, model={model or 'default'}")
                 else:
                     self.logger.info(f"Applying template '{template.frontmatter.name}': all default tools, model={model or 'default'}")
+
+            if tools is not None:
+                allowed_tools = tools
+            metadata.update(command_tool_policy(allowed_tools))
 
             # Check if agent name already exists (scoped to this orchestrator)
             existing = await get_agent_by_name(self.orchestrator_agent_id, name)
@@ -1041,26 +1066,8 @@ class AgentManager:
                 agent_id, agent.name, task_slug, entry_counter
             )
 
-            # Default allowed tools - comprehensive set for general work
-            default_allowed = [
-                "Read",
-                "Write",
-                "Edit",
-                "Bash",
-                "Glob",
-                "Grep",
-                "Task",
-                "WebFetch",
-                "WebSearch",
-                "BashOutput",
-                "SlashCommand",
-                "TodoWrite",
-                "KillShell",
-                "AskUserQuestion",
-                "Skill",
-            ]
-
-            default_disallowed = ["NotebookEdit", "ExitPlanMode"]
+            # The tool policy fixed at creation (template or explicit tools)
+            tool_policy = stored_tool_policy(agent.metadata)
 
             # Pass ANTHROPIC_API_KEY explicitly to ensure subprocess has access
             env_vars = {}
@@ -1075,8 +1082,8 @@ class AgentManager:
                 resume=agent.session_id,
                 hooks=hooks_dict,
                 max_turns=config.MAX_AGENT_TURNS,
-                allowed_tools=default_allowed,
-                disallowed_tools=default_disallowed,
+                allowed_tools=tool_policy["allowed_tools"],
+                disallowed_tools=tool_policy["disallowed_tools"],
                 permission_mode="acceptEdits",
                 env=env_vars,  # Ensure API key is available to subprocess
                 setting_sources=["project"],  # Load CLAUDE.md and slash commands

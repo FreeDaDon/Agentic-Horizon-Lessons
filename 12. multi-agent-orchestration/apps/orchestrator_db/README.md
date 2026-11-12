@@ -18,7 +18,8 @@ apps/orchestrator_db/
 │   └── README.md            # Migration system documentation
 ├── models.py                # Pydantic models (source of truth)
 ├── run_migrations.py        # Migration runner script
-├── sync_models.py           # Model synchronization script
+├── drop_table.py            # Drops named tables (development only)
+├── psql_cli.py              # Builds psql invocations (password via PGPASSWORD, ON_ERROR_STOP)
 └── README.md                # This file
 ```
 
@@ -28,7 +29,7 @@ This directory serves as the **single source of truth** for:
 
 1. **Database Schema** - PostgreSQL table definitions (via migrations)
 2. **Data Models** - Pydantic models for type-safe database operations
-3. **Model Distribution** - Syncing models to orchestrator apps
+3. **Model Distribution** - The backend keeps a copy in `orch_database_models.py`
 
 ## 🚀 Quick Start
 
@@ -46,17 +47,13 @@ This will:
 - ✅ Set up trigger functions for auto-timestamps
 - ✅ Preserve existing data (idempotent operations)
 
-### Sync Models to Apps
+### Copy Models to the Backend
 
-After modifying `models.py`, sync to both orchestrator apps:
+After modifying `models.py`, copy it to the orchestrator backend:
 
 ```bash
-python apps/orchestrator_db/sync_models.py
+cp apps/orchestrator_db/models.py apps/orchestrator_3_stream/backend/modules/orch_database_models.py
 ```
-
-This copies models to:
-- `apps/orchestrator_1_term/modules/orch_database_models.py`
-- `apps/orchestrator_2_stream/server/models.py`
 
 ## 📋 Files Explained
 
@@ -125,19 +122,13 @@ print(agent.id)  # Works with both UUID objects and strings
 - DATABASE_URL in root `.env` file
 - Python 3.12+
 
-### `sync_models.py` - Model Sync Script
+### `psql_cli.py` - psql Invocation Helper
 
-**Purpose:** Copy `models.py` to both orchestrator applications.
+**Purpose:** Build the `psql` command line for `drop_table.py` (and `run_migrations.py` where it shells out to psql).
 
 **Why:**
-- Maintains single source of truth
-- Prevents model drift between apps
-- Simplifies updates (change once, sync everywhere)
-
-**When to Run:**
-- After modifying any Pydantic model in `models.py`
-- After adding new models
-- After changing field types or validators
+- The password moves from the connection URL into `PGPASSWORD`, so it never shows in the process list
+- `-v ON_ERROR_STOP=1` makes psql exit non-zero on the first failing statement, so a broken migration is reported as failed
 
 ## 🗄️ Database Schema
 
@@ -190,7 +181,7 @@ Auto-update `updated_at` timestamps:
 
 1. Edit `models.py`
 2. Add/modify model classes
-3. Sync to apps: `python apps/orchestrator_db/sync_models.py`
+3. Copy to the backend: `cp apps/orchestrator_db/models.py apps/orchestrator_3_stream/backend/modules/orch_database_models.py`
 4. Update database schema if needed
 
 ### Drop Individual Tables (Development Only)
@@ -247,7 +238,7 @@ uv run apps/orchestrator_db/run_migrations.py
 
 ### Guidelines
 
-1. **Never modify models directly in apps** - Always update `models.py` and sync
+1. **Never modify models directly in apps** - Always update `models.py` and copy it to the backend
 2. **Use idempotent SQL** - All migrations should use `IF NOT EXISTS`
 3. **Test migrations** - Always test on development DB first
 4. **Document changes** - Update READMEs when adding features
@@ -259,8 +250,8 @@ uv run apps/orchestrator_db/run_migrations.py
 # 1. Make changes to models.py
 vim apps/orchestrator_db/models.py
 
-# 2. Sync to apps
-python apps/orchestrator_db/sync_models.py
+# 2. Copy to the backend
+cp apps/orchestrator_db/models.py apps/orchestrator_3_stream/backend/modules/orch_database_models.py
 
 # 3. Update migrations if schema changed
 vim apps/orchestrator_db/migrations/X_table.sql
@@ -299,11 +290,11 @@ vim .env
 
 ### Models out of sync between apps
 
-**Cause:** Forgot to run sync script after updating models.
+**Cause:** Forgot to copy `models.py` to the backend after updating it.
 
 **Solution:**
 ```bash
-python apps/orchestrator_db/sync_models.py
+cp apps/orchestrator_db/models.py apps/orchestrator_3_stream/backend/modules/orch_database_models.py
 ```
 
 ### Migration fails

@@ -8,7 +8,7 @@ import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List, Dict, Any
 from pathlib import Path
 import json
@@ -17,7 +17,16 @@ import time
 from rich.console import Console
 
 # Import configuration
-from modules.config import DEFAULT_CODEBASE_PATH, PLAN_DIRECTORY, REVIEW_DIRECTORY
+from modules.config import (
+    ALLOWED_ORIGINS_ENV,
+    DEFAULT_ALLOWED_ORIGINS,
+    DEFAULT_CODEBASE_PATH,
+    DEFAULT_MODEL,
+    PLAN_DIRECTORY,
+    REVIEW_DIRECTORY,
+    ModelAlias,
+)
+from modules.origin_guard import RejectDisallowedOrigins, allowed_origins
 from rich.panel import Panel
 from rich.table import Table
 
@@ -77,14 +86,16 @@ async def lifespan(app: FastAPI):
 # Create FastAPI app with lifespan
 app = FastAPI(title="Micro SDLC Agent API", version="1.0.0", lifespan=lifespan)
 
-# CORS configuration
+ALLOWED_ORIGINS = allowed_origins(ALLOWED_ORIGINS_ENV, DEFAULT_ALLOWED_ORIGINS)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, specify exact origins
+    allow_origins=ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RejectDisallowedOrigins, allowed=ALLOWED_ORIGINS)
 
 
 # WebSocket connections for real-time updates
@@ -166,8 +177,17 @@ workflow_tracker = WorkflowTracker()
 class CreateTicketRequest(BaseModel):
     title: str
     content_user_request_prompt: str
-    model: str = "sonnet"
+    model: ModelAlias = DEFAULT_MODEL
     parent_codebase_path: str = DEFAULT_CODEBASE_PATH
+
+    @field_validator("parent_codebase_path")
+    @classmethod
+    def resolve_codebase_path(cls, value: str) -> str:
+        # Relative paths ("." and "./frontend" in the UI) are relative to the app root.
+        path = (Path(DEFAULT_CODEBASE_PATH) / Path(value).expanduser()).resolve()
+        if not path.is_dir():
+            raise ValueError(f"not an existing directory: {value}")
+        return str(path)
 
 
 class UpdateTicketStageRequest(BaseModel):
@@ -357,7 +377,7 @@ async def run_workflow(ticket_id: int):
         plan_result = await run_planner_agent(
             user_prompt=ticket["content_user_request_prompt"],
             model=ticket["model"],
-            codebase_path=DEFAULT_CODEBASE_PATH,
+            codebase_path=ticket["parent_codebase_path"],
             resume_session_id=(
                 plan_session_id if plan_session_id and plan_session_id.strip() else None
             ),
@@ -401,7 +421,7 @@ async def run_workflow(ticket_id: int):
         build_result = await run_builder_agent(
             plan_path=plan_result["plan_path"],
             model=ticket["model"],
-            codebase_path=DEFAULT_CODEBASE_PATH,
+            codebase_path=ticket["parent_codebase_path"],
             resume_session_id=(
                 build_session_id
                 if build_session_id and build_session_id.strip()
@@ -442,7 +462,7 @@ async def run_workflow(ticket_id: int):
             plan_path=plan_result["plan_path"],
             ticket_title=ticket["title"],
             model=ticket["model"],
-            codebase_path=DEFAULT_CODEBASE_PATH,
+            codebase_path=ticket["parent_codebase_path"],
             resume_session_id=(
                 review_session_id
                 if review_session_id and review_session_id.strip()

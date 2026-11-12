@@ -2,6 +2,11 @@
 """
 Test concurrent workflow execution
 Demonstrates that multiple agents can run simultaneously
+
+A live-server script, not a pytest test: it drives a running backend and starts real
+agents. Start the backend, then from backend/ run:
+
+    uv run --with aiohttp python ../test_concurrent.py
 """
 
 import asyncio

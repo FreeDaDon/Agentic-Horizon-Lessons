@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/dangerous_command_blocker.py",
+            "command": "uv run --script \"$CLAUDE_PROJECT_DIR/.claude/hooks/dangerous_command_blocker.py\"",
             "timeout": 5
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py"
+            "command": "uv run --script \"$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py\""
           }
         ]
       }
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py"
+            "command": "uv run --script \"$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py\""
           }
         ]
       }
@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py"
+            "command": "uv run --script \"$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py\""
           }
         ]
       }
@@ -47,7 +47,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py"
+            "command": "uv run --script \"$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py\""
           }
         ]
       }
@@ -57,7 +57,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py"
+            "command": "uv run --script \"$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py\""
           }
         ]
       }
@@ -67,7 +67,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py"
+            "command": "uv run --script \"$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py\""
           }
         ]
       }
@@ -78,7 +78,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py"
+            "command": "uv run --script \"$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py\""
           }
         ]
       }
@@ -89,7 +89,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py"
+            "command": "uv run --script \"$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py\""
           }
         ]
       }
@@ -99,7 +99,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py"
+            "command": "uv run --script \"$CLAUDE_PROJECT_DIR/.claude/hooks/universal_hook_logger.py\""
           }
         ]
       }

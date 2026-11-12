@@ -59,6 +59,24 @@ async def submit_analysis_tool(args: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+ALERT_SCRIPT = [
+    "on run argv",
+    "display alert (item 2 of argv) message (item 3 of argv) buttons {item 1 of argv} default button 1",
+    "end run",
+]
+
+
+def alert_command(title: str, message: str, button_text: str) -> list[str]:
+    """osascript argv that shows an alert; title and message never become AppleScript source.
+
+    They come from posts on a public firehose, so interpolating them into the script would
+    let a post run `do shell script`. The fixed button text goes first: osascript stops
+    reading options at the first plain argument, so a title starting with "-e" stays text.
+    """
+    statements = [arg for line in ALERT_SCRIPT for arg in ("-e", line)]
+    return ["osascript", *statements, button_text, title, message]
+
+
 @tool(
     "notify",
     "Send macOS notification for important social media content",
@@ -94,15 +112,11 @@ async def notify_tool(args: Dict[str, Any]) -> Dict[str, Any]:
 
         # Primary notification: macOS alert dialog
         # Alerts are more visible and always appear
-        script = f"""
-        display alert "{title}" ¬
-        message "{message}" ¬
-        buttons {{"{button_text}"}} ¬
-        default button 1
-        """
-
         result = subprocess.run(
-            ["osascript", "-e", script], capture_output=True, text=True, timeout=30
+            alert_command(title, message, button_text),
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
 
         # Secondary notification: TTS audio (if available)

@@ -1,9 +1,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "asyncpg>=0.29.0",
-#   "python-dotenv>=1.0.0",
-#   "websockets>=12.0",
+#   "asyncpg==0.30.0",
+#   "python-dotenv==1.2.1",
+#   "websockets==15.0.1",
 # ]
 # ///
 """
@@ -174,6 +174,25 @@ async def update_adw_status(
             WHERE id = $1
         """
         result = await conn.execute(query, *params)
+        return result == "UPDATE 1"
+
+
+async def merge_adw_output(adw_id: str, data: dict[str, Any]) -> bool:
+    """Merge keys into ai_developer_workflows.output_data (top-level JSONB merge).
+
+    Returns:
+        True if updated, False if not found
+    """
+    async with get_connection() as conn:
+        result = await conn.execute(
+            """
+            UPDATE ai_developer_workflows
+            SET output_data = COALESCE(output_data, '{}'::jsonb) || $2::jsonb, updated_at = NOW()
+            WHERE id = $1
+            """,
+            uuid.UUID(adw_id),
+            json.dumps(data),
+        )
         return result == "UPDATE 1"
 
 

@@ -1,9 +1,9 @@
 # /// script
 # requires-python = ">=3.11"
 # dependencies = [
-#   "pydantic>=2.0",
-#   "claude-agent-sdk>=0.1.18",
-#   "rich>=13.0",
+#   "pydantic==2.12.3",
+#   "claude-agent-sdk==0.2.163",
+#   "rich==14.2.0",
 # ]
 # ///
 """
@@ -11,7 +11,7 @@ ADW Agent SDK - Abstract typed layer for Claude Agent SDK control.
 
 This module provides well-typed Pydantic models for configuring and controlling
 the Claude Agent SDK. It is intentionally abstract and can be used for any
-Agent SDK use case - ADW-specific concerns belong in the higher-level adw_agents.py.
+Agent SDK use case - ADW-specific concerns belong in the higher-level adw_steps.py.
 
 Usage:
     uv run adw_agent_sdk.py
@@ -20,12 +20,10 @@ Usage:
 from __future__ import annotations
 
 import asyncio
-from abc import ABC, abstractmethod
 from datetime import datetime
 from enum import Enum
 from typing import (
     Any,
-    AsyncGenerator,
     Awaitable,
     Callable,
     Literal,
@@ -110,14 +108,6 @@ class SystemMessageSubtype(str, Enum):
     COMPACT_BOUNDARY = "compact_boundary"
 
 
-class ResultSubtype(str, Enum):
-    """Subtypes for result messages."""
-
-    SUCCESS = "success"
-    ERROR = "error"
-    INTERRUPTED = "interrupted"
-
-
 # =============================================================================
 # BUILT-IN TOOLS
 # =============================================================================
@@ -140,37 +130,6 @@ class BuiltInTool(str, Enum):
     WEB_SEARCH = "WebSearch"
     WRITE = "Write"
     SKILL = "Skill"
-
-
-# =============================================================================
-# TOOL PERMISSIONS
-# =============================================================================
-
-
-class ToolPermissions(BaseModel):
-    """Tool permission configuration with allow/ask/deny arrays.
-
-    Bash rules use prefix matching (not regex):
-        "Bash(npm run:*)" - allows any npm run command
-        "Bash(git push:*)" - requires confirmation for git push
-
-    File rules use path patterns:
-        "Read(./.env)" - blocks reading .env
-        "Write(./secrets/**)" - blocks writing to secrets dir
-    """
-
-    allow: list[str] = Field(
-        default_factory=list,
-        description="Tools/patterns to explicitly allow without prompting",
-    )
-    ask: list[str] = Field(
-        default_factory=list,
-        description="Tools/patterns that require user confirmation",
-    )
-    deny: list[str] = Field(
-        default_factory=list,
-        description="Tools/patterns to completely block",
-    )
 
 
 # =============================================================================
@@ -256,6 +215,7 @@ class HookInputBase(BaseModel):
     session_id: str
     transcript_path: str
     cwd: str
+    permission_mode: str | None = None
 
 
 class PreToolUseInput(HookInputBase):
@@ -665,14 +625,21 @@ class UserMessage(BaseModel):
 
 
 class ResultMessage(BaseModel):
-    """Final result message."""
+    """Final result message.
+
+    `subtype` is the SDK's own value: "success", or an error such as
+    "error_max_turns", "error_max_budget_usd", "error_during_execution".
+    """
 
     type: Literal[MessageType.RESULT] = MessageType.RESULT
-    subtype: ResultSubtype
+    subtype: str
+    is_error: bool = False
     result: str | None = None
     error: str | None = None
     usage: TokenUsage | None = None
     session_id: str | None = None
+    num_turns: int | None = None
+    total_cost_usd: float | None = None
 
 
 AgentMessage: TypeAlias = (
@@ -685,76 +652,60 @@ AgentMessage: TypeAlias = (
 
 
 # =============================================================================
-# MCP SERVER CONFIGURATION
-# =============================================================================
-
-
-class MCPServerConfig(BaseModel):
-    """Configuration for an MCP server.
-
-    Tool names follow pattern: mcp__<server_name>__<tool_name>
-    """
-
-    name: str
-    command: str | None = None
-    args: list[str] = Field(default_factory=list)
-    env: dict[str, str] = Field(default_factory=dict)
-    is_sdk_server: bool = Field(
-        default=False, description="True for in-process SDK MCP servers"
-    )
-
-
-# =============================================================================
 # QUERY OPTIONS
 # =============================================================================
 
 
-class QueryOptions(BaseModel):
-    """Complete configuration options for an Agent SDK query."""
+PermissionMode: TypeAlias = Literal["default", "acceptEdits", "plan", "dontAsk", "auto"]
+"""claude_agent_sdk.types.PermissionMode (0.2.163) minus the bypass mode: an unattended ADW step must
+never skip permission checks, so the type makes that option unrepresentable."""
 
-    # Model
+
+class QueryOptions(BaseModel):
+    """Options for an Agent SDK query. Every field maps to a ClaudeAgentOptions field
+    of the same name (see build_sdk_options); there are no wrapper-only knobs."""
+
     model: ModelName | str = Field(default=ModelName.SONNET)
 
     # Session management
     resume: str | None = Field(None, description="Session ID to resume")
-    fork_session: bool = Field(
-        default=False, alias="forkSession", description="Fork when resuming"
-    )
+    fork_session: bool = Field(default=False, description="Fork when resuming")
 
-    # Working directory
     cwd: str | None = Field(None, description="Working directory for the agent")
 
-    # Tools
+    # Permissions and tools
+    permission_mode: PermissionMode = Field(
+        default="default",
+        description="'dontAsk' denies anything not pre-approved; 'acceptEdits' auto-approves file edits",
+    )
+    tools: list[str] | None = Field(
+        default=None,
+        description="Base set of built-in tools; [] disables every built-in tool, None keeps the default set",
+    )
     allowed_tools: list[str] = Field(
         default_factory=list,
-        alias="allowedTools",
-        description="Tools the agent can use. Include 'Skill' for skills.",
+        description="Tools (or rules like 'Bash(git diff:*)') approved without prompting",
     )
-    permissions: ToolPermissions | None = None
-    bypass_permissions: bool = Field(
-        default=True,
-        alias="bypassPermissions",
-        description="Skip permission prompts (default: True)",
+    disallowed_tools: list[str] = Field(
+        default_factory=list,
+        description="Tools removed from the model's context; wins over allowed_tools",
     )
 
     # Hooks - accepts HooksConfig or simple {event_name: [callbacks]} dict
     hooks: HooksConfig | HookCallbackMap | None = None
 
-    # MCP servers
-    mcp_servers: dict[str, MCPServerConfig] = Field(
-        default_factory=dict, alias="mcpServers"
-    )
+    # MCP servers: SDK McpServerConfig values, e.g. from claude_agent_sdk.create_sdk_mcp_server
+    mcp_servers: dict[str, Any] = Field(default_factory=dict)
 
     # Settings sources (for skills/commands) - default to project
     setting_sources: list[SettingSource] = Field(
         default_factory=lambda: [SettingSource.PROJECT],
-        alias="settingSources",
         description="Sources for loading skills/commands (default: ['project'])",
     )
 
-    # Limits
-    max_turns: int | None = Field(default=None, alias="maxTurns")
-    max_tokens: int | None = Field(default=None, alias="maxTokens")
+    # Caps: the SDK ends the run with an error_max_turns / error_max_budget_usd result
+    max_turns: int | None = None
+    max_budget_usd: float | None = None
 
     # System prompt - supports three modes:
     # 1. None: Uses Claude Code's default system prompt
@@ -763,14 +714,11 @@ class QueryOptions(BaseModel):
     #    (SystemPromptConfig is defined later in file, so using Any here)
     system_prompt: str | Any | None = Field(
         default=None,
-        alias="systemPrompt",
         description="System prompt config: None=default, str=overwrite, or use SystemPromptConfig for APPEND mode",
     )
 
     # NOTE: `model_config` is Pydantic's class configuration (not related to Claude model field above).
-    # It controls how Pydantic processes this class: aliases, enum handling, callable types, etc.
     model_config = ConfigDict(
-        populate_by_name=True,       # Accept both "allowedTools" and "allowed_tools"
         arbitrary_types_allowed=True, # Allow Callable types (for hooks)
         use_enum_values=True,         # Auto-convert enums to their .value
     )
@@ -861,7 +809,12 @@ class QueryOutput(BaseModel):
     error: str | None = None
     session_id: str | None = None
     usage: TokenUsage | None = None
-    usage_accumulator: UsageAccumulator | None = None
+    usage_accumulator: UsageAccumulator = Field(default_factory=UsageAccumulator)
+    result_subtype: str | None = Field(
+        None, description="SDK result subtype, e.g. 'success' or 'error_max_turns'; None if no result arrived"
+    )
+    num_turns: int | None = None
+    total_cost_usd: float | None = None
     messages: list[AgentMessage] = Field(default_factory=list)
     started_at: datetime | None = None
     completed_at: datetime | None = None
@@ -875,7 +828,56 @@ class QueryOutput(BaseModel):
 # =============================================================================
 
 
-async def query_to_completion(query_input: QueryInput) -> QueryOutput:
+def build_sdk_options(opts: QueryOptions) -> Any:
+    """Translate QueryOptions into claude_agent_sdk.ClaudeAgentOptions, field for field."""
+    from claude_agent_sdk import ClaudeAgentOptions
+
+    if opts.system_prompt is None:
+        system_prompt: Any = {"type": "preset", "preset": "claude_code"}
+    elif hasattr(opts.system_prompt, "to_sdk_config"):
+        system_prompt = opts.system_prompt.to_sdk_config()
+    else:
+        system_prompt = opts.system_prompt
+
+    hooks = opts.hooks
+    if isinstance(hooks, dict):
+        hooks = HooksConfig.from_callbacks(hooks)
+
+    return ClaudeAgentOptions(
+        model=opts.model,
+        resume=opts.resume,
+        fork_session=opts.fork_session,
+        cwd=opts.cwd,
+        permission_mode=opts.permission_mode,
+        tools=opts.tools,
+        allowed_tools=list(opts.allowed_tools),
+        disallowed_tools=list(opts.disallowed_tools),
+        hooks=_convert_hooks_to_sdk_format(hooks) if hooks is not None else None,
+        mcp_servers=dict(opts.mcp_servers),
+        setting_sources=list(opts.setting_sources),
+        max_turns=opts.max_turns,
+        max_budget_usd=opts.max_budget_usd,
+        system_prompt=system_prompt,
+    )
+
+
+def _token_usage(usage_data: Any, total_cost_usd: float | None = None) -> TokenUsage | None:
+    if not usage_data:
+        return None
+    get = usage_data.get if isinstance(usage_data, dict) else (lambda k, d=0: getattr(usage_data, k, d))
+    return TokenUsage(
+        input_tokens=get("input_tokens", 0) or 0,
+        output_tokens=get("output_tokens", 0) or 0,
+        cache_read_input_tokens=get("cache_read_input_tokens", 0) or 0,
+        cache_creation_input_tokens=get("cache_creation_input_tokens", 0) or 0,
+        total_cost_usd=total_cost_usd,
+    )
+
+
+async def query_to_completion(
+    query_input: QueryInput,
+    client_factory: Callable[[Any], Any] | None = None,
+) -> QueryOutput:
     """Execute an Agent SDK query and return the complete result.
 
     This is the primary method for running Claude Agent SDK queries.
@@ -883,6 +885,8 @@ async def query_to_completion(query_input: QueryInput) -> QueryOutput:
 
     Args:
         query_input: QueryInput containing prompt and options.
+        client_factory: Builds the client from ClaudeAgentOptions. Defaults to
+            ClaudeSDKClient; offline tests pass a client that replays recorded messages.
 
     Returns:
         QueryOutput with success status, result, session_id, usage, and messages.
@@ -908,76 +912,28 @@ async def query_to_completion(query_input: QueryInput) -> QueryOutput:
     """
     from claude_agent_sdk import (
         ClaudeSDKClient,
-        ClaudeAgentOptions,
         AssistantMessage as SDKAssistantMessage,
         UserMessage as SDKUserMessage,
         SystemMessage as SDKSystemMessage,
         ResultMessage as SDKResultMessage,
         TextBlock as SDKTextBlock,
-        ThinkingBlock as SDKThinkingBlock,
         ToolUseBlock as SDKToolUseBlock,
         ToolResultBlock as SDKToolResultBlock,
     )
 
     started_at = datetime.now()
-    opts = query_input.options
     handlers = query_input.handlers
+    sdk_options = build_sdk_options(query_input.options)
 
-    # Normalize hooks to HooksConfig
-    resolved_hooks: HooksConfig | None = None
-    if opts.hooks is not None:
-        if isinstance(opts.hooks, dict):
-            resolved_hooks = HooksConfig.from_callbacks(opts.hooks)
-        else:
-            resolved_hooks = opts.hooks
-
-    # Build SDK options dict
-    options_dict: dict[str, Any] = {
-        "model": opts.model if isinstance(opts.model, str) else opts.model.value,
-    }
-
-    if opts.cwd:
-        options_dict["cwd"] = opts.cwd
-    if opts.allowed_tools:
-        options_dict["allowed_tools"] = opts.allowed_tools
-    if opts.max_turns:
-        options_dict["max_turns"] = opts.max_turns
-    if opts.resume:
-        options_dict["resume"] = opts.resume
-
-    # Handle system_prompt with three modes: DEFAULT, APPEND, OVERWRITE
-    if opts.system_prompt is None:
-        # Mode 1: DEFAULT - Use Claude Code's default system prompt
-        options_dict["system_prompt"] = {
-            "type": "preset",
-            "preset": "claude_code",
-        }
-    elif isinstance(opts.system_prompt, str):
-        # Mode 3: OVERWRITE (backward compatible) - string means complete overwrite
-        options_dict["system_prompt"] = opts.system_prompt
-    elif hasattr(opts.system_prompt, "to_sdk_config"):
-        # SystemPromptConfig - convert to SDK format
-        options_dict["system_prompt"] = opts.system_prompt.to_sdk_config()
-    else:
-        # Fallback - pass through as-is
-        options_dict["system_prompt"] = opts.system_prompt
-
-    if opts.setting_sources:
-        options_dict["setting_sources"] = [s.value if hasattr(s, 'value') else s for s in opts.setting_sources]
-
-    # Add hooks if provided (SDK format: {"PreToolUse": [HookMatcher(...)], ...})
-    if resolved_hooks is not None:
-        options_dict["hooks"] = _convert_hooks_to_sdk_format(resolved_hooks)
-
-    sdk_options = ClaudeAgentOptions(**options_dict)
-
-    # Execute query
     messages: list[AgentMessage] = []
     usage_accumulator = UsageAccumulator()
     session_id: str | None = None
     final_result: str | None = None
     final_error: str | None = None
     final_usage: TokenUsage | None = None
+    result_subtype: str | None = None
+    num_turns: int | None = None
+    total_cost_usd: float | None = None
     success = False
 
     # Helper to call message handlers
@@ -1004,11 +960,9 @@ async def query_to_completion(query_input: QueryInput) -> QueryOutput:
             await handlers.on_any(parsed)
 
     try:
-        async with ClaudeSDKClient(options=sdk_options) as client:
-            # Send prompt
+        async with (client_factory or ClaudeSDKClient)(sdk_options) as client:
             await client.query(query_input.prompt)
 
-            # Process all messages from response stream
             async for message in client.receive_response():
 
                 # Handle SystemMessage (session init, compact boundary)
@@ -1040,43 +994,41 @@ async def query_to_completion(query_input: QueryInput) -> QueryOutput:
                     content_blocks: list[Any] = []
 
                     for block in message.content:
-                        # Store original SDK block instance in content_blocks
                         content_blocks.append(block)
-
-                        # Call on_assistant_block handler for each block (TextBlock, ThinkingBlock, ToolUseBlock)
                         if handlers and handlers.on_assistant_block:
                             await handlers.on_assistant_block(block)
 
-                        # Also extract convenience fields
                         if isinstance(block, SDKTextBlock):
                             text_parts.append(block.text)
-                        elif isinstance(block, SDKThinkingBlock):
-                            # Thinking blocks are captured in content_blocks
-                            pass
-                        elif isinstance(block, SDKToolUseBlock):
-                            # First tool use goes to convenience field
-                            if tool_use_data is None:
-                                tool_use_data = {
-                                    "id": block.id,
-                                    "name": block.name,
-                                    "input": block.input,
-                                }
+                        elif isinstance(block, SDKToolUseBlock) and tool_use_data is None:
+                            tool_use_data = {
+                                "id": block.id,
+                                "name": block.name,
+                                "input": block.input,
+                            }
+
+                    # One API message can arrive split across several AssistantMessages
+                    # that share a message_id and repeat the same usage; count it once.
+                    message_id = message.message_id or str(id(message))
+                    message_usage = _token_usage(message.usage)
+                    if message_usage is not None:
+                        usage_accumulator.process(message_id, message_usage)
 
                     parsed = AssistantMessage(
-                        id=str(id(message)),  # Use object id as unique identifier
-                        content_blocks=content_blocks,  # SDK block instances
+                        id=message_id,
+                        content_blocks=content_blocks,
                         message="\n".join(text_parts) if text_parts else None,
                         tool_use=tool_use_data,
-                        usage=None,  # Usage is on ResultMessage
+                        usage=message_usage,
                     )
                     messages.append(parsed)
                     await call_handlers(parsed)
 
                 # Handle UserMessage (tool results)
                 elif isinstance(message, SDKUserMessage):
-                    text_parts: list[str] = []
+                    text_parts = []
                     tool_result_data: dict[str, Any] | None = None
-                    content_blocks: list[Any] = []
+                    content_blocks = []
 
                     # UserMessage.content can be str or list of blocks
                     content = message.content
@@ -1087,13 +1039,12 @@ async def query_to_completion(query_input: QueryInput) -> QueryOutput:
                             content_blocks.append(block)
                             if isinstance(block, SDKTextBlock):
                                 text_parts.append(block.text)
-                            elif isinstance(block, SDKToolResultBlock):
-                                if tool_result_data is None:
-                                    tool_result_data = {
-                                        "tool_use_id": block.tool_use_id,
-                                        "content": block.content,
-                                        "is_error": block.is_error or False,
-                                    }
+                            elif isinstance(block, SDKToolResultBlock) and tool_result_data is None:
+                                tool_result_data = {
+                                    "tool_use_id": block.tool_use_id,
+                                    "content": block.content,
+                                    "is_error": block.is_error or False,
+                                }
 
                     parsed = UserMessage(
                         content_blocks=content_blocks,
@@ -1105,56 +1056,37 @@ async def query_to_completion(query_input: QueryInput) -> QueryOutput:
 
                 # Handle ResultMessage (final result with usage)
                 elif isinstance(message, SDKResultMessage):
-                    usage_data = getattr(message, "usage", None)
-                    parsed_usage: TokenUsage | None = None
-
-                    if usage_data:
-                        if isinstance(usage_data, dict):
-                            parsed_usage = TokenUsage(
-                                input_tokens=usage_data.get("input_tokens", 0),
-                                output_tokens=usage_data.get("output_tokens", 0),
-                                cache_read_input_tokens=usage_data.get("cache_read_input_tokens", 0),
-                                cache_creation_input_tokens=usage_data.get("cache_creation_input_tokens", 0),
-                                total_cost_usd=getattr(message, "total_cost_usd", None),
-                            )
-                        else:
-                            parsed_usage = TokenUsage(
-                                input_tokens=getattr(usage_data, "input_tokens", 0),
-                                output_tokens=getattr(usage_data, "output_tokens", 0),
-                                cache_read_input_tokens=getattr(usage_data, "cache_read_input_tokens", 0),
-                                cache_creation_input_tokens=getattr(usage_data, "cache_creation_input_tokens", 0),
-                                total_cost_usd=getattr(message, "total_cost_usd", None),
-                            )
-
-                    subtype_str = getattr(message, "subtype", "error")
-                    is_error = getattr(message, "is_error", False)
-
+                    total_cost_usd = message.total_cost_usd
+                    is_error = message.is_error
+                    errors = "; ".join(message.errors or [])
                     parsed = ResultMessage(
-                        subtype=ResultSubtype.ERROR if is_error else ResultSubtype.SUCCESS,
-                        result=getattr(message, "result", None),
-                        error=getattr(message, "error", None) if is_error else None,
-                        usage=parsed_usage,
-                        session_id=getattr(message, "session_id", None),
+                        subtype=message.subtype,
+                        is_error=is_error,
+                        result=message.result,
+                        error=(errors or message.result or message.subtype) if is_error else None,
+                        usage=_token_usage(message.usage, total_cost_usd),
+                        session_id=message.session_id,
+                        num_turns=message.num_turns,
+                        total_cost_usd=total_cost_usd,
                     )
 
                     messages.append(parsed)
                     await call_handlers(parsed)
 
-                    # Capture final state
-                    if is_error:
-                        success = False
-                        final_error = parsed.error
-                    else:
-                        success = True
-                        final_result = parsed.result
-
-                    final_usage = parsed_usage
+                    success = not is_error
+                    final_result = parsed.result
+                    final_error = parsed.error
+                    final_usage = parsed.usage
+                    result_subtype = parsed.subtype
+                    num_turns = parsed.num_turns
                     if parsed.session_id:
                         session_id = parsed.session_id
 
     except Exception as e:
+        # After an error result the CLI exits non-zero and the SDK raises; keep the
+        # result's own error text, which says why (e.g. error_max_turns).
         success = False
-        final_error = str(e)
+        final_error = final_error or str(e)
 
     completed_at = datetime.now()
 
@@ -1165,6 +1097,9 @@ async def query_to_completion(query_input: QueryInput) -> QueryOutput:
         session_id=session_id,
         usage=final_usage,
         usage_accumulator=usage_accumulator,
+        result_subtype=result_subtype,
+        num_turns=num_turns,
+        total_cost_usd=total_cost_usd,
         messages=messages,
         started_at=started_at,
         completed_at=completed_at,
@@ -1289,138 +1224,6 @@ def _convert_hooks_to_sdk_format(config: HooksConfig) -> dict[str, Any]:
     convert_matchers(config.pre_compact, "PreCompact")
 
     return result
-
-
-def _parse_sdk_message(msg: Any) -> AgentMessage | None:
-    """Parse an SDK message into our typed message format.
-
-    The SDK returns actual typed objects:
-    - SystemMessage(subtype='init', data={...})
-    - AssistantMessage(content=[TextBlock|ToolUseBlock|...], model='...')
-    - ResultMessage(subtype='success', result='...', usage={...})
-    - UserMessage(content=[...])
-    """
-    import uuid
-
-    msg_class = type(msg).__name__
-
-    if msg_class == "SystemMessage":
-        subtype = getattr(msg, "subtype", None)
-        data = getattr(msg, "data", {})
-
-        if subtype == "init":
-            return SystemInitMessage(
-                session_id=data.get("session_id", ""),
-                slash_commands=data.get("slash_commands", []),
-                tools=data.get("tools", []),
-            )
-        elif subtype == "compact_boundary":
-            return CompactBoundaryMessage(
-                compact_metadata=data.get("compact_metadata", data),
-            )
-
-    elif msg_class == "AssistantMessage":
-        # Extract text from content blocks
-        content = getattr(msg, "content", [])
-        text_parts = []
-        tool_use_data = None
-        content_blocks = []
-
-        for block in content:
-            content_blocks.append(block)  # Store original SDK block
-            block_type = type(block).__name__
-            if block_type == "TextBlock":
-                text_parts.append(getattr(block, "text", ""))
-            elif block_type == "ToolUseBlock":
-                if tool_use_data is None:
-                    tool_use_data = {
-                        "id": getattr(block, "id", ""),
-                        "name": getattr(block, "name", ""),
-                        "input": getattr(block, "input", {}),
-                    }
-            elif block_type == "ThinkingBlock":
-                # Captured in content_blocks
-                pass
-
-        message_text = "\n".join(text_parts) if text_parts else None
-
-        return AssistantMessage(
-            id=str(uuid.uuid4()),  # SDK doesn't provide message ID directly
-            content_blocks=content_blocks,
-            message=message_text,
-            tool_use=tool_use_data,
-            usage=None,  # Usage is only on ResultMessage
-        )
-
-    elif msg_class == "UserMessage":
-        content = getattr(msg, "content", [])
-        text_parts = []
-        tool_result_data = None
-        content_blocks = []
-
-        # UserMessage.content can be str or list
-        if isinstance(content, str):
-            text_parts.append(content)
-        elif isinstance(content, list):
-            for block in content:
-                content_blocks.append(block)  # Store original SDK block
-                block_type = type(block).__name__
-                if block_type == "TextBlock":
-                    text_parts.append(getattr(block, "text", ""))
-                elif block_type == "ToolResultBlock":
-                    if tool_result_data is None:
-                        tool_result_data = {
-                            "tool_use_id": getattr(block, "tool_use_id", ""),
-                            "content": getattr(block, "content", ""),
-                            "is_error": getattr(block, "is_error", False),
-                        }
-
-        message_text = "\n".join(text_parts) if text_parts else None
-
-        return UserMessage(
-            content_blocks=content_blocks,
-            message=message_text,
-            tool_result=tool_result_data,
-        )
-
-    elif msg_class == "ResultMessage":
-        subtype_str = getattr(msg, "subtype", "error")
-        usage_data = getattr(msg, "usage", None)
-        usage = None
-
-        if usage_data and isinstance(usage_data, dict):
-            usage = TokenUsage(
-                input_tokens=usage_data.get("input_tokens", 0),
-                output_tokens=usage_data.get("output_tokens", 0),
-                cache_read_input_tokens=usage_data.get("cache_read_input_tokens", 0),
-                cache_creation_input_tokens=usage_data.get("cache_creation_input_tokens", 0),
-                total_cost_usd=getattr(msg, "total_cost_usd", None),
-            )
-
-        return ResultMessage(
-            subtype=ResultSubtype(subtype_str) if subtype_str in ["success", "error", "interrupted"] else ResultSubtype.ERROR,
-            result=getattr(msg, "result", None),
-            error=getattr(msg, "error", None) if hasattr(msg, "error") else None,
-            usage=usage,
-            session_id=getattr(msg, "session_id", None),
-        )
-
-    return None
-
-
-# Keep abstract interface for custom implementations
-class AgentSDKInterface(ABC):
-    """Abstract interface for custom Agent SDK implementations."""
-
-    @abstractmethod
-    async def query(self, input_data: QueryInput) -> AsyncGenerator[AgentMessage, None]:
-        """Execute a query and yield messages as they arrive."""
-        ...
-
-    @abstractmethod
-    async def run(self, input_data: QueryInput) -> QueryOutput:
-        """Execute a query and wait for complete result."""
-        ...
 
 
 # =============================================================================
@@ -1631,11 +1434,11 @@ async def quick_prompt(input_data: AdhocPrompt) -> str:
 # MAIN - CLI FOR DIRECT EXECUTION
 # =============================================================================
 #
-# Tests have been moved to: adws/adw_tests/adw_modules/adw_agent_sdk.py
+# Tests have been moved to: adws/adw_tests/live/adw_agent_sdk.py
 #
 # Run tests with:
-#   uv run adws/adw_tests/adw_modules/adw_agent_sdk.py <test-type>
-#   uv run adws/adw_tests/adw_modules/adw_agent_sdk.py --list
+#   uv run adws/adw_tests/live/adw_agent_sdk.py <test-type>
+#   uv run adws/adw_tests/live/adw_agent_sdk.py --list
 #
 
 
@@ -1643,8 +1446,8 @@ if __name__ == "__main__":
     print("ADW Agent SDK - Core Module")
     print()
     print("This module provides the core SDK wrapper. Tests have been moved to:")
-    print("  adws/adw_tests/adw_modules/adw_agent_sdk.py")
+    print("  adws/adw_tests/live/adw_agent_sdk.py")
     print()
     print("Run tests with:")
-    print("  uv run adws/adw_tests/adw_modules/adw_agent_sdk.py <test-type>")
-    print("  uv run adws/adw_tests/adw_modules/adw_agent_sdk.py --list")
+    print("  uv run adws/adw_tests/live/adw_agent_sdk.py <test-type>")
+    print("  uv run adws/adw_tests/live/adw_agent_sdk.py --list")

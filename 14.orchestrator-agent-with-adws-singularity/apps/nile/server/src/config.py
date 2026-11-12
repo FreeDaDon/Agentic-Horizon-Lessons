@@ -1,5 +1,6 @@
 """Configuration settings for Nile server."""
 import os
+import re
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -19,4 +20,16 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
 
 # Server settings
 API_PREFIX = "/api"
-CORS_ORIGINS = ["http://localhost:5173", "http://127.0.0.1:5173", "https://5173-*.e2b.app"]
+
+# Comma-separated browser origins allowed by CORS. A "*" stands for one hostname
+# label of letters, digits and hyphens (e.g. the per-sandbox E2B preview hosts).
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS", "http://localhost:5173,http://127.0.0.1:5173,https://5173-*.e2b.app"
+    ).split(",")
+    if origin.strip()
+]
+CORS_ORIGIN_REGEX = "|".join(
+    re.escape(origin).replace(r"\*", "[A-Za-z0-9-]+") for origin in CORS_ORIGINS if "*" in origin
+) or None

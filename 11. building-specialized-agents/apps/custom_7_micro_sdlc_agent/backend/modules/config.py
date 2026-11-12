@@ -5,6 +5,7 @@ Central location for application-wide settings and constants
 """
 
 from pathlib import Path
+from typing import Literal
 
 # ============================================================================
 # PATH CONFIGURATION
@@ -36,14 +37,17 @@ DEFAULT_CODEBASE_PATH = str(BACKEND_DIR.parent)
 PLAN_DIRECTORY = "specs"
 REVIEW_DIRECTORY = "reviews"
 
-# Default model for agents
-DEFAULT_MODEL = "sonnet"
+ModelAlias = Literal["opus", "sonnet", "haiku"]
+DEFAULT_MODEL: ModelAlias = "sonnet"
 
-# Available models
-AVAILABLE_MODELS = [
-    "sonnet",
-    "opus"
-]
+# ============================================================================
+# SERVER CONFIGURATION
+# ============================================================================
+
+# Browser origins allowed to call the API: the Vite dev server (frontend/vite.config.js).
+# Override with a comma-separated list in MICRO_SDLC_ALLOWED_ORIGINS.
+ALLOWED_ORIGINS_ENV = "MICRO_SDLC_ALLOWED_ORIGINS"
+DEFAULT_ALLOWED_ORIGINS = ["http://localhost:5174", "http://127.0.0.1:5174"]
 
 # ============================================================================
 # DATABASE CONFIGURATION

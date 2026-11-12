@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router';
 import { useProductsStore } from '../stores/products';
 import { useCartStore } from '../stores/cart';
 import { useExpertiseStore } from '../stores/expertise';
-import api from '../services/api';
+import { useUserStore } from '../stores/user';
 import LoadingSpinner from '../components/common/LoadingSpinner.vue';
 import GenericSlogan from '../components/products/GenericSlogan.vue';
 import SpecificSlogan from '../components/products/SpecificSlogan.vue';
@@ -18,6 +18,7 @@ import type { ComponentType } from '../types';
 const router = useRouter();
 const productsStore = useProductsStore();
 const cartStore = useCartStore();
+const userStore = useUserStore();
 const expertiseStore = useExpertiseStore();
 
 // Live timer state
@@ -89,17 +90,17 @@ onMounted(async () => {
   ]);
 
   // Use WebSocket streaming for home page - sections appear progressively!
-  const userId = api.getUserId();
-  if (userId) {
+  const session = userStore.session;
+  if (session) {
     try {
-      await productsStore.fetchHomePageStreaming(userId);
+      await productsStore.fetchHomePageStreaming(session);
     } catch (e) {
       console.warn('[HomeView] Streaming failed, falling back to HTTP:', e);
       // Fallback to HTTP if WebSocket fails
       await productsStore.fetchHomePage();
     }
   } else {
-    // No user ID - use HTTP fallback
+    // No session - use HTTP fallback
     await productsStore.fetchHomePage();
   }
 
