@@ -19,7 +19,8 @@ Checks, per expertise file:
 
 Usage:
   check_expertise.py [--tolerance 15] [--count-tolerance 0.15] [--json] [--fix] [PATH ...]
-With no PATH, checks every tracked */expertise.yaml under .claude/commands/experts/.
+With no PATH, checks every tracked */expertise.yaml under .claude/commands/experts/, except the
+deliberately broken lab starters.
 Exit status: 0 clean, 1 drift found, 2 unreadable or invalid YAML.
 """
 
@@ -170,7 +171,7 @@ def apply_fixes(expertise: Path, findings: list[Finding]) -> int:
 def tracked_expertise_files() -> list[Path]:
     out = subprocess.run(["git", "ls-files", "*/.claude/commands/experts/*/expertise.yaml"],
                          capture_output=True, text=True, check=True).stdout
-    return [Path(p) for p in out.splitlines()]
+    return [Path(p) for p in out.splitlines() if not p.startswith("labs/starters/")]  # starters drift on purpose
 
 
 def main(argv: list[str] | None = None) -> int:
